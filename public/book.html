@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Book a Walk — Kaylee's Dog Walking Service</title>
+  <meta name="description" content="Book a dog walk with Kaylee in McKenzie Towne, Calgary. Pick a date, time slot and walk length — it takes about a minute.">
+  <link rel="icon" type="image/svg+xml" href="/img/paw.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;700;800&family=Outfit:wght@400;500;600;700&family=Nothing+You+Could+Do&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="/">
+        <img src="/img/paw.svg" alt="Kaylee's Dog Walking Service paw print logo">
+        <span class="brand-name">Kaylee's Dog Walking Service<small>McKenzie Towne, Calgary</small></span>
+      </a>
+      <nav class="site-nav">
+        <a href="/">Home</a>
+        <a href="/about.html">About</a>
+        <a href="/services.html">Services</a>
+        <a href="/reviews.html">Reviews</a>
+        <a href="/book.html" class="nav-cta active">Book a walk</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="section">
+      <div class="wrap" style="max-width:760px;">
+        <p class="section-kicker">let's do this</p>
+        <h1>Book a walk</h1>
+        <p class="sub" style="font-size:1.12rem;">Tell me about your pup and pick a time. If a neighbour on your street books the same slot, you'll both get $5 off automatically. Questions? Text me at <a href="tel:+15874332199">587-433-2199</a>.</p>
+
+        <form id="booking-form" class="card" style="margin-top:24px;" novalidate>
+          <div class="form-grid">
+            <div>
+              <label for="ownerName">Your name</label>
+              <input id="ownerName" name="ownerName" type="text" autocomplete="name" required maxlength="80" placeholder="e.g. Jordan Miller">
+            </div>
+            <div>
+              <label for="dogName">Dog's name</label>
+              <input id="dogName" name="dogName" type="text" required maxlength="80" placeholder="e.g. Biscuit">
+            </div>
+            <div>
+              <label for="dogSize">Dog's size</label>
+              <select id="dogSize" name="dogSize" required>
+                <option value="" disabled selected>Choose…</option>
+              </select>
+            </div>
+            <div>
+              <label for="phone">Your phone number</label>
+              <input id="phone" name="phone" type="tel" autocomplete="tel" required maxlength="25" placeholder="e.g. 403-555-0123">
+            </div>
+            <div class="full">
+              <label for="address">Street address</label>
+              <input id="address" name="address" type="text" autocomplete="street-address" required maxlength="120" placeholder="e.g. 128 Prestwick Ave SE">
+              <p class="hint">I use the street to match you with neighbour group walks and plan the route.</p>
+            </div>
+            <div>
+              <label for="date">Date</label>
+              <input id="date" name="date" type="date" required>
+            </div>
+            <div>
+              <label for="slot">Time slot</label>
+              <select id="slot" name="slot" required>
+                <option value="" disabled selected>Choose…</option>
+              </select>
+            </div>
+            <div>
+              <label for="duration">Walk length</label>
+              <select id="duration" name="duration" required>
+                <option value="" disabled selected>Choose…</option>
+              </select>
+            </div>
+            <div>
+              <label for="notes">Anything I should know? <span class="opt">(optional)</span></label>
+              <input id="notes" name="notes" type="text" maxlength="500" placeholder="e.g. scared of skateboards">
+            </div>
+            <div class="full">
+              <button id="submit-btn" class="btn btn-gold" type="submit">Book my walk</button>
+            </div>
+          </div>
+          <div id="form-msg" class="form-msg" hidden></div>
+        </form>
+
+        <p class="hand" style="font-size:1.35rem; margin-top:24px;">see you and your pup on the paths soon!</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap foot-cols">
+      <div>
+        <a class="brand" href="/">
+          <img src="/img/paw.svg" alt="">
+          <span class="brand-name">Kaylee's Dog Walking Service<small>McKenzie Towne, Calgary</small></span>
+        </a>
+        <p class="foot-note">treats every dog like her own</p>
+      </div>
+      <div>
+        <h3>Say hi</h3>
+        <ul>
+          <li>Call or text Kaylee: <a href="tel:+15874332199">587-433-2199</a></li>
+          <li><a href="/book.html">Book a walk online</a></li>
+        </ul>
+      </div>
+      <div>
+        <h3>Service area</h3>
+        <p>McKenzie Towne, Calgary — Inverness, Prestwick, Elgin and the paths around the pond.</p>
+      </div>
+    </div>
+    <div class="wrap foot-bottom">© 2026 Kaylee's Dog Walking Service · <a href="/schedule.html">Kaylee's schedule</a></div>
+  </footer>
+
+  <script src="/js/book.js"></script>
+</body>
+</html>

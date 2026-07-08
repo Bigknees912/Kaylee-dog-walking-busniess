@@ -1,0 +1,15 @@
+{
+  "name": "kaylees-dog-walking-service",
+  "version": "1.0.0",
+  "description": "Website and booking system for Kaylee's Dog Walking Service in McKenzie Towne, Calgary",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}

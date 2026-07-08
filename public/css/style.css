@@ -1,0 +1,577 @@
+/* =========================================================
+   Kaylee's Dog Walking Service — brand system
+   lake teal   #175E63
+   deep pine   #0E2E2B
+   gold        #DFA542
+   mist        #F1F4EF
+   sage        #A8C3B2
+   ========================================================= */
+
+:root {
+  --teal: #175E63;
+  --pine: #0E2E2B;
+  --gold: #DFA542;
+  --mist: #F1F4EF;
+  --sage: #A8C3B2;
+  --white: #FFFFFF;
+  --font-display: "Bricolage Grotesque", "Outfit", sans-serif;
+  --font-body: "Outfit", sans-serif;
+  --font-hand: "Nothing You Could Do", cursive;
+  --radius: 16px;
+  --shadow: 0 6px 24px rgba(14, 46, 43, 0.10);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--mist);
+  color: var(--pine);
+  font-family: var(--font-body);
+  font-size: 1.06rem;
+  line-height: 1.65;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  color: var(--pine);
+  line-height: 1.15;
+  margin: 0 0 0.5em;
+}
+
+h1 { font-size: clamp(2.3rem, 6vw, 3.6rem); font-weight: 800; }
+h2 { font-size: clamp(1.6rem, 4vw, 2.2rem); font-weight: 700; }
+h3 { font-size: 1.25rem; font-weight: 700; }
+
+p { margin: 0 0 1em; }
+
+a { color: var(--teal); }
+
+img { max-width: 100%; }
+
+.wrap {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.hand {
+  font-family: var(--font-hand);
+  color: var(--teal);
+  font-size: 1.25em;
+}
+
+.gold-hand {
+  font-family: var(--font-hand);
+  color: var(--gold);
+}
+
+/* ---------- header / nav ---------- */
+
+.site-header {
+  background: var(--mist);
+  border-bottom: 1px solid rgba(168, 195, 178, 0.55);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.site-header .wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: var(--pine);
+}
+
+.brand img { width: 40px; height: 40px; }
+
+.brand-name {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.15rem;
+  line-height: 1.1;
+}
+
+.brand-name small {
+  display: block;
+  font-family: var(--font-hand);
+  font-weight: 400;
+  font-size: 0.8rem;
+  color: var(--teal);
+}
+
+.site-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.site-nav a {
+  text-decoration: none;
+  color: var(--pine);
+  font-weight: 500;
+  padding: 8px 12px;
+  border-radius: 999px;
+}
+
+.site-nav a:hover { background: rgba(168, 195, 178, 0.35); }
+
+.site-nav a.active { background: rgba(168, 195, 178, 0.5); }
+
+.site-nav a.nav-cta {
+  background: var(--teal);
+  color: var(--white);
+  font-weight: 600;
+}
+
+.site-nav a.nav-cta:hover { background: var(--pine); }
+
+/* ---------- buttons ---------- */
+
+.btn {
+  display: inline-block;
+  border: 0;
+  cursor: pointer;
+  text-decoration: none;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 1.05rem;
+  padding: 14px 28px;
+  border-radius: 999px;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.btn-primary { background: var(--teal); color: var(--white); }
+.btn-primary:hover { background: var(--pine); transform: translateY(-1px); }
+
+.btn-gold { background: var(--gold); color: var(--pine); }
+.btn-gold:hover { filter: brightness(0.95); transform: translateY(-1px); }
+
+.btn-quiet {
+  background: transparent;
+  color: var(--teal);
+  border: 2px solid var(--sage);
+}
+.btn-quiet:hover { border-color: var(--teal); }
+
+.btn-small { padding: 8px 16px; font-size: 0.92rem; }
+
+.btn-danger { background: transparent; color: #8a3226; border: 2px solid #d9b0a8; }
+.btn-danger:hover { border-color: #8a3226; }
+
+/* ---------- hero ---------- */
+
+.hero {
+  padding: 72px 0 56px;
+  background:
+    radial-gradient(1100px 420px at 85% -10%, rgba(168, 195, 178, 0.35), transparent 70%),
+    var(--mist);
+}
+
+.hero .wrap {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 40px;
+  align-items: center;
+}
+
+.hero-kicker {
+  font-family: var(--font-hand);
+  color: var(--gold);
+  font-size: 1.35rem;
+  margin-bottom: 8px;
+}
+
+.hero p.sub {
+  font-size: 1.2rem;
+  max-width: 34em;
+  color: rgba(14, 46, 43, 0.85);
+}
+
+.hero-actions {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.hero-art {
+  display: flex;
+  justify-content: center;
+}
+
+.hero-art .paw-badge {
+  width: min(280px, 70%);
+  aspect-ratio: 1;
+  background: var(--white);
+  border: 2px solid var(--sage);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow);
+}
+
+.hero-art img { width: 62%; }
+
+/* ---------- trust row ---------- */
+
+.trust-row {
+  padding: 26px 0 8px;
+}
+
+.trust-row .wrap {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+}
+
+.trust-item {
+  background: var(--white);
+  border: 1px solid rgba(168, 195, 178, 0.6);
+  border-radius: var(--radius);
+  padding: 20px 22px;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  box-shadow: var(--shadow);
+}
+
+.trust-item .dot {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: rgba(223, 165, 66, 0.18);
+  color: var(--teal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+}
+
+.trust-item h3 { margin-bottom: 2px; font-size: 1.05rem; }
+.trust-item p { margin: 0; font-size: 0.95rem; color: rgba(14, 46, 43, 0.8); }
+
+/* ---------- generic sections & cards ---------- */
+
+.section { padding: 56px 0; }
+.section.tight { padding: 32px 0; }
+
+.section-kicker {
+  font-family: var(--font-hand);
+  color: var(--gold);
+  font-size: 1.3rem;
+  margin-bottom: 4px;
+}
+
+.card {
+  background: var(--white);
+  border: 1px solid rgba(168, 195, 178, 0.6);
+  border-radius: var(--radius);
+  padding: 26px 28px;
+  box-shadow: var(--shadow);
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
+}
+
+.pine-band {
+  background: var(--pine);
+  color: var(--mist);
+  padding: 56px 0;
+}
+
+.pine-band h2, .pine-band h3 { color: var(--mist); }
+.pine-band .hand { color: var(--gold); }
+.pine-band a { color: var(--sage); }
+.pine-band a.btn-gold { color: var(--pine); }
+
+/* ---------- pricing ---------- */
+
+.price-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.price-card .price {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 2.4rem;
+  color: var(--teal);
+}
+
+.price-card .price span { font-size: 1rem; font-weight: 500; color: rgba(14, 46, 43, 0.7); }
+
+.price-card ul {
+  margin: 6px 0 14px;
+  padding-left: 20px;
+  color: rgba(14, 46, 43, 0.85);
+}
+
+.price-card li { margin-bottom: 4px; }
+
+.price-card .btn { align-self: flex-start; margin-top: auto; }
+
+.price-card.featured { border: 2px solid var(--gold); }
+
+.badge {
+  display: inline-block;
+  background: rgba(223, 165, 66, 0.2);
+  color: #8a6420;
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 3px 12px;
+  align-self: flex-start;
+}
+
+/* ---------- reviews ---------- */
+
+.review-card { position: relative; }
+
+.review-card .stars { color: var(--gold); letter-spacing: 3px; margin-bottom: 8px; }
+
+.review-card .who {
+  font-weight: 600;
+  color: var(--teal);
+  margin: 0;
+}
+
+.review-card .placeholder-tag {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #7c7360;
+  background: rgba(168, 195, 178, 0.3);
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+
+.notice {
+  background: rgba(223, 165, 66, 0.14);
+  border: 1px dashed var(--gold);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  font-size: 0.98rem;
+}
+
+/* ---------- forms ---------- */
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 18px;
+}
+
+.form-grid .full { grid-column: 1 / -1; }
+
+label {
+  display: block;
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin-bottom: 6px;
+}
+
+label .opt { font-weight: 400; color: rgba(14, 46, 43, 0.6); }
+
+input, select, textarea {
+  width: 100%;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  color: var(--pine);
+  background: var(--white);
+  border: 2px solid var(--sage);
+  border-radius: 10px;
+  padding: 11px 12px;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--teal);
+}
+
+textarea { resize: vertical; min-height: 90px; }
+
+.form-msg {
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-weight: 500;
+  margin-top: 16px;
+}
+
+.form-msg.ok { background: rgba(23, 94, 99, 0.1); color: var(--teal); }
+.form-msg.err { background: rgba(138, 50, 38, 0.1); color: #8a3226; }
+
+.hint { font-size: 0.9rem; color: rgba(14, 46, 43, 0.65); margin-top: 4px; }
+
+/* ---------- schedule (Kaylee's view) ---------- */
+
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.stat-tile {
+  background: var(--white);
+  border: 1px solid rgba(168, 195, 178, 0.6);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  box-shadow: var(--shadow);
+}
+
+.stat-tile .num {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.9rem;
+  color: var(--teal);
+}
+
+.stat-tile .lbl { font-size: 0.88rem; color: rgba(14, 46, 43, 0.7); }
+
+.day-heading {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.15rem;
+  margin: 30px 0 12px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid var(--sage);
+}
+
+.walk-card { margin-bottom: 16px; }
+
+.walk-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.walk-title { font-family: var(--font-display); font-weight: 700; font-size: 1.1rem; }
+
+.walk-total { font-weight: 700; color: var(--teal); }
+
+.walk-status {
+  font-size: 0.8rem;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 3px 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.walk-status.booked { background: rgba(223, 165, 66, 0.2); color: #8a6420; }
+.walk-status.done { background: rgba(23, 94, 99, 0.12); color: var(--teal); }
+
+.dog-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 0;
+  border-top: 1px solid rgba(168, 195, 178, 0.45);
+}
+
+.dog-row .dog-main { font-weight: 600; }
+.dog-row .dog-sub { font-size: 0.9rem; color: rgba(14, 46, 43, 0.7); }
+.dog-row .dog-price { font-weight: 700; color: var(--teal); white-space: nowrap; }
+
+.dog-row.cancelled-row { opacity: 0.55; text-decoration: line-through; }
+.dog-row.done-row .dog-price::after { content: " ✓"; }
+
+.discount-chip {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #8a6420;
+  background: rgba(223, 165, 66, 0.22);
+  border-radius: 999px;
+  padding: 2px 9px;
+  margin-left: 6px;
+  white-space: nowrap;
+}
+
+.walk-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+/* ---------- footer ---------- */
+
+.site-footer {
+  background: var(--pine);
+  color: rgba(241, 244, 239, 0.9);
+  padding: 44px 0 30px;
+  margin-top: 64px;
+}
+
+.foot-cols {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 1fr;
+  gap: 30px;
+}
+
+.site-footer h3 { color: var(--mist); font-size: 1.05rem; }
+
+.site-footer a { color: var(--sage); text-decoration: none; }
+.site-footer a:hover { text-decoration: underline; }
+
+.site-footer .brand { color: var(--mist); margin-bottom: 8px; }
+.site-footer .brand-name small { color: var(--gold); }
+
+.site-footer .foot-note {
+  font-family: var(--font-hand);
+  color: var(--gold);
+  font-size: 1.05rem;
+}
+
+.site-footer ul { list-style: none; margin: 0; padding: 0; }
+.site-footer li { margin-bottom: 6px; }
+
+.foot-bottom {
+  margin-top: 30px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(168, 195, 178, 0.25);
+  font-size: 0.85rem;
+  color: rgba(241, 244, 239, 0.6);
+  text-align: center;
+}
+
+.foot-bottom a { color: rgba(168, 195, 178, 0.7); }
+
+/* ---------- responsive ---------- */
+
+@media (max-width: 800px) {
+  .hero .wrap { grid-template-columns: 1fr; }
+  .hero-art { order: -1; }
+  .hero-art .paw-badge { width: 170px; }
+  .trust-row .wrap { grid-template-columns: 1fr; }
+  .form-grid { grid-template-columns: 1fr; }
+  .foot-cols { grid-template-columns: 1fr; }
+}

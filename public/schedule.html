@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kaylee's Schedule — Kaylee's Dog Walking Service</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" type="image/svg+xml" href="/img/paw.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;700;800&family=Outfit:wght@400;500;600;700&family=Nothing+You+Could+Do&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="/">
+        <img src="/img/paw.svg" alt="Kaylee's Dog Walking Service paw print logo">
+        <span class="brand-name">Kaylee's Dog Walking Service<small>McKenzie Towne, Calgary</small></span>
+      </a>
+      <nav class="site-nav">
+        <a href="/">Home</a>
+        <a href="/about.html">About</a>
+        <a href="/services.html">Services</a>
+        <a href="/reviews.html">Reviews</a>
+        <a href="/book.html" class="nav-cta">Book a walk</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="section">
+      <div class="wrap">
+        <p class="section-kicker">for Kaylee's eyes only</p>
+        <h1>Kaylee's schedule</h1>
+
+        <div id="gate" class="card" style="max-width:420px;" hidden>
+          <h3>Enter your passcode</h3>
+          <p class="hint" style="margin-top:0;">This page is just for Kaylee — walkers-in-training need not apply. 🐾</p>
+          <form id="gate-form">
+            <label for="passcode">Passcode</label>
+            <input id="passcode" name="passcode" type="password" autocomplete="current-password" required>
+            <div id="gate-msg" class="form-msg err" hidden></div>
+            <button class="btn btn-primary" type="submit" style="margin-top:14px;">Unlock schedule</button>
+          </form>
+        </div>
+
+        <div id="schedule-view" hidden>
+          <div class="walk-actions" style="margin-bottom:20px;">
+            <button id="refresh-btn" class="btn btn-quiet btn-small" type="button">Refresh</button>
+            <button id="lock-btn" class="btn btn-quiet btn-small" type="button">Lock</button>
+          </div>
+
+          <div id="stats-row" class="stats-row"></div>
+
+          <p class="hint">Bookings with the same date, time and walk length are grouped into one walk (up to three dogs) and sorted by street for an efficient route. Neighbour discounts apply automatically.</p>
+
+          <div id="walks"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap foot-cols">
+      <div>
+        <a class="brand" href="/">
+          <img src="/img/paw.svg" alt="">
+          <span class="brand-name">Kaylee's Dog Walking Service<small>McKenzie Towne, Calgary</small></span>
+        </a>
+        <p class="foot-note">treats every dog like her own</p>
+      </div>
+      <div>
+        <h3>Say hi</h3>
+        <ul>
+          <li>Call or text Kaylee: <a href="tel:+15874332199">587-433-2199</a></li>
+          <li><a href="/book.html">Book a walk online</a></li>
+        </ul>
+      </div>
+      <div>
+        <h3>Service area</h3>
+        <p>McKenzie Towne, Calgary — Inverness, Prestwick, Elgin and the paths around the pond.</p>
+      </div>
+    </div>
+    <div class="wrap foot-bottom">© 2026 Kaylee's Dog Walking Service · <a href="/schedule.html">Kaylee's schedule</a></div>
+  </footer>
+
+  <script src="/js/schedule.js"></script>
+</body>
+</html>

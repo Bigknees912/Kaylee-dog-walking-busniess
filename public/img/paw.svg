@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Paw print with a gold water ripple in the pad">
+  <defs>
+    <clipPath id="pad-clip">
+      <circle cx="32" cy="42" r="13.5"/>
+    </clipPath>
+  </defs>
+  <!-- toes -->
+  <circle cx="12.5" cy="28.5" r="6" fill="#175E63"/>
+  <circle cx="24" cy="17.5" r="6.5" fill="#175E63"/>
+  <circle cx="40" cy="17.5" r="6.5" fill="#175E63"/>
+  <circle cx="51.5" cy="28.5" r="6" fill="#175E63"/>
+  <!-- pad -->
+  <circle cx="32" cy="42" r="13.5" fill="#175E63"/>
+  <!-- gold ripple carved into the pad, echoing the lake -->
+  <g clip-path="url(#pad-clip)" fill="none" stroke="#DFA542" stroke-width="2.4" stroke-linecap="round">
+    <circle cx="32" cy="56" r="5.5"/>
+    <circle cx="32" cy="56" r="11"/>
+    <circle cx="32" cy="56" r="16.5"/>
+  </g>
+</svg>
