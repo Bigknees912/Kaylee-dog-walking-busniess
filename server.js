@@ -16,7 +16,7 @@ const PORT = process.env.PORT || 3000;
 // Kaylee's schedule passcode. Override with the KAYLEE_PASSCODE env var.
 const PASSCODE = process.env.KAYLEE_PASSCODE || 'goldenpaws';
 
-const DATA_DIR = path.join(__dirname, 'data');
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const DATA_FILE = path.join(DATA_DIR, 'bookings.json');
 
 // ---------------------------------------------------------------------------

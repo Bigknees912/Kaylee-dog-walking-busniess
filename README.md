@@ -41,3 +41,39 @@ committed to git). Back that file up if you move the site to a new machine.
   more dogs from the same street share a time slot
 - Max three dogs per walk; a shared slot only accepts one walk length
 - Bookings can't be made for past dates
+
+## Marketing materials (print at home)
+
+With the server running, open these pages and hit Print (margins: Default,
+scale: 100%):
+
+- `/print/business-cards.html` — a letter-size sheet of 10 business cards.
+  Cut along the dashed lines.
+- `/print/poster.html` — a letter-size tear-off poster with 8 phone-number
+  tabs. Snip between the tabs so they tear easily.
+
+Both pieces carry a QR code (`public/img/qr-site.svg`) that points to
+`https://kaylees-dog-walking.onrender.com/` — the address the site gets when
+deployed with the included `render.yaml`. If you deploy somewhere else or buy
+a custom domain, regenerate the QR code for the new address (e.g. with the
+`qrcode` npm package: `npx qrcode -t svg -o public/img/qr-site.svg "https://your-domain.com/"`).
+
+Tip from the marketing plan: as soon as there's a real photo of Kaylee with a
+dog, swap it into the round photo slot on the poster — a real person beats a
+logo.
+
+## Deploying so the QR code works
+
+1. Push this repo to GitHub (already done if you're reading this there).
+2. Sign in at [render.com](https://render.com) → **New** → **Blueprint** →
+   connect this repo → **Apply**. The included `render.yaml` names the service
+   `kaylees-dog-walking`, which gives it the URL above.
+3. Set `KAYLEE_PASSCODE` when prompted (don't use the default).
+4. Free plan note: bookings reset when the service restarts. For permanent
+   storage, use the starter plan and uncomment the disk section in
+   `render.yaml`.
+
+To use a custom domain later (e.g. `kayleesdogwalking.ca`), buy it at any
+registrar, add it under the Render service's **Settings → Custom Domains**,
+and point the DNS `CNAME` where Render tells you. Then regenerate the QR code
+and reprint.

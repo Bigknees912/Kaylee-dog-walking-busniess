@@ -1,0 +1,26 @@
+# Render blueprint — deploys the site at https://kaylees-dog-walking.onrender.com
+# (the QR code on the poster and business cards points there).
+#
+# To deploy: sign in at https://render.com → New → Blueprint → connect this
+# GitHub repo → Apply. Set KAYLEE_PASSCODE when prompted.
+services:
+  - type: web
+    name: kaylees-dog-walking
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: KAYLEE_PASSCODE
+        sync: false # set this in the Render dashboard — don't commit the real passcode
+    # NOTE: on the free plan the bookings file lives on ephemeral disk, so
+    # bookings reset whenever the service restarts or redeploys. To keep them
+    # permanently, switch to the starter plan and uncomment:
+    # plan: starter
+    # disk:
+    #   name: bookings-data
+    #   mountPath: /data
+    #   sizeGB: 1
+    # ...and add under envVars:
+    #   - key: DATA_DIR
+    #     value: /data

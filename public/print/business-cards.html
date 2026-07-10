@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Business Cards (print sheet) — Kaylee's Dog Walking Service</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" type="image/svg+xml" href="/img/paw.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700;800&family=Outfit:wght@400;500;600;700&family=Nothing+You+Could+Do&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --teal: #175E63;
+      --pine: #0E2E2B;
+      --gold: #DFA542;
+      --mist: #F1F4EF;
+    }
+    * { box-sizing: border-box; margin: 0; }
+    body {
+      font-family: "Outfit", sans-serif;
+      background: #cfd8d4;
+      color: var(--pine);
+    }
+
+    /* On-screen helper bar — hidden when printing */
+    .no-print {
+      background: var(--pine);
+      color: #fff;
+      padding: 14px 20px;
+      font-size: 0.95rem;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .no-print strong { color: var(--gold); }
+    .no-print button {
+      font: 600 0.95rem "Outfit", sans-serif;
+      background: var(--gold);
+      color: var(--pine);
+      border: 0;
+      border-radius: 8px;
+      padding: 8px 18px;
+      cursor: pointer;
+    }
+
+    /* Letter sheet, 10 cards (2 × 5), each 3.5in × 2in */
+    @page { size: letter portrait; margin: 0.5in; }
+    .sheet {
+      width: 7.5in;
+      margin: 24px auto;
+      background: #fff;
+      display: grid;
+      grid-template-columns: repeat(2, 3.5in);
+      justify-content: center;
+      gap: 0;
+    }
+    @media print {
+      body { background: #fff; }
+      .no-print { display: none; }
+      .sheet { margin: 0 auto; }
+    }
+
+    .card {
+      width: 3.5in;
+      height: 2in;
+      border: 1px dashed #b7c4bf; /* cut guide */
+      padding: 0.14in;
+      display: flex;
+      gap: 0.12in;
+      align-items: stretch;
+      background: #fff;
+      overflow: hidden;
+      break-inside: avoid;
+    }
+
+    .card-left {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .card-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.07in;
+    }
+    .card-brand img { width: 0.28in; height: 0.28in; }
+    .card-brand span {
+      font: 700 10.5pt "Bricolage Grotesque", sans-serif;
+      color: var(--teal);
+      line-height: 1.05;
+    }
+    .card-area {
+      font-size: 6.6pt;
+      color: #5b6d68;
+      margin-top: 0.03in;
+      letter-spacing: 0.02em;
+    }
+    .card-offer {
+      margin-top: auto;
+      font: 800 13pt "Bricolage Grotesque", sans-serif;
+      color: var(--pine);
+      line-height: 1.05;
+    }
+    .card-offer .gold { color: #b07f22; }
+    .card-price {
+      font: 600 8.5pt "Outfit", sans-serif;
+      color: var(--teal);
+      margin-top: 0.03in;
+    }
+    .card-phone {
+      margin-top: 0.06in;
+      font: 800 15pt "Bricolage Grotesque", sans-serif;
+      color: var(--teal);
+      letter-spacing: 0.01em;
+      line-height: 1;
+    }
+    .card-phone small {
+      display: block;
+      font: 500 6.6pt "Outfit", sans-serif;
+      color: #5b6d68;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 0.02in;
+    }
+    .card-proof {
+      font-size: 7pt;
+      color: var(--pine);
+      margin-top: 0.05in;
+    }
+
+    .card-right {
+      width: 0.95in;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.05in;
+      border-left: 1.5pt solid var(--mist);
+      padding-left: 0.1in;
+    }
+    .card-right img { width: 0.82in; height: 0.82in; }
+    .card-right span {
+      font-size: 6.4pt;
+      font-weight: 600;
+      color: var(--teal);
+      text-align: center;
+      line-height: 1.25;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="no-print">
+    <strong>Business cards — print sheet.</strong>
+    <span>Letter paper, 10 cards per page. In the print dialog set margins to <strong>Default</strong> and scale to <strong>100%</strong>, then cut along the dashed lines.</span>
+    <button onclick="window.print()">Print</button>
+  </div>
+
+  <div class="sheet" id="sheet"></div>
+
+  <template id="card-tpl">
+    <div class="card">
+      <div class="card-left">
+        <div class="card-brand">
+          <img src="/img/paw.svg" alt="">
+          <span>Kaylee's<br>Dog Walking</span>
+        </div>
+        <p class="card-area">McKenzie Towne · Calgary</p>
+        <p class="card-offer">First walk <span class="gold">half price</span></p>
+        <p class="card-price">$20 · 30-minute walk</p>
+        <div class="card-phone">
+          <small>Call or text Kaylee</small>
+          587-433-2199
+        </div>
+        <p class="card-proof">Photo of your pup after every walk 🐾</p>
+      </div>
+      <div class="card-right">
+        <img src="/img/qr-site.svg" alt="QR code linking to the booking website">
+        <span>Scan to<br>book online</span>
+      </div>
+    </div>
+  </template>
+
+  <script>
+    const sheet = document.getElementById('sheet');
+    const tpl = document.getElementById('card-tpl');
+    for (let i = 0; i < 10; i++) sheet.appendChild(tpl.content.cloneNode(true));
+  </script>
+</body>
+</html>
