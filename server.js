@@ -174,6 +174,7 @@ function buildSchedule() {
           status: b.status,
           priceCents,
           neighbourDiscount: neighbourGroup,
+          photoOptOut: !!b.photoOptOut,
         };
       })
       .sort(
@@ -257,6 +258,8 @@ app.post('/api/bookings', (req, res) => {
   const slot = String(body.slot || '').trim();
   const duration = Number(body.duration);
   const notes = String(body.notes || '').trim().slice(0, 500);
+  const waiverAgreed = body.waiverAgreed === true;
+  const photoOptOut = body.photoOptOut === true;
 
   const problems = [];
   if (!ownerName) problems.push('your name');
@@ -278,6 +281,13 @@ app.post('/api/bookings', (req, res) => {
   if (date < todayString()) {
     res.status(400).json({
       error: 'That date has already passed — please pick today or a future date.',
+    });
+    return;
+  }
+
+  if (!waiverAgreed) {
+    res.status(400).json({
+      error: 'Please check the box agreeing to the terms before booking.',
     });
     return;
   }
@@ -312,6 +322,8 @@ app.post('/api/bookings', (req, res) => {
     slot,
     duration,
     notes,
+    waiverAgreed,
+    photoOptOut,
     status: STATUS.BOOKED,
     createdAt: new Date().toISOString(),
   };

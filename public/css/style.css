@@ -679,6 +679,35 @@ html.js .reveal.in {
 
 .liability-body p + p { margin-top: 10px; }
 
+.waiver-box {
+  background: var(--mist);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  font-size: 0.88rem;
+  color: #4c5f5b;
+  line-height: 1.55;
+  margin-bottom: 14px;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-weight: 500;
+  font-size: 0.95rem;
+  cursor: pointer;
+  margin-bottom: 10px;
+}
+
+.checkbox-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  flex: none;
+  accent-color: var(--teal);
+  cursor: pointer;
+}
+
 /* ---------- forms ---------- */
 
 .form-grid {
@@ -815,6 +844,17 @@ textarea { resize: vertical; min-height: 90px; }
   font-weight: 700;
   color: #8a6420;
   background: rgba(223, 165, 66, 0.22);
+  border-radius: 999px;
+  padding: 2px 9px;
+  margin-left: 6px;
+  white-space: nowrap;
+}
+
+.no-photos-chip {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #a23b3b;
+  background: rgba(162, 59, 59, 0.14);
   border-radius: 999px;
   padding: 2px 9px;
   margin-left: 6px;

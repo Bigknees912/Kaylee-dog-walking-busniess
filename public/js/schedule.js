@@ -119,6 +119,9 @@
       if (dog.neighbourDiscount) {
         main.appendChild(el('span', 'discount-chip', 'neighbour group −$5'));
       }
+      if (dog.photoOptOut) {
+        main.appendChild(el('span', 'no-photos-chip', 'no photos'));
+      }
       info.appendChild(main);
       info.appendChild(
         el('div', 'dog-sub', dog.ownerName + ' · ' + dog.phone + ' · ' + dog.address)

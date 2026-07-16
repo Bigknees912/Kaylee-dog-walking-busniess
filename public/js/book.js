@@ -80,6 +80,12 @@
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     msg.hidden = true;
+
+    if (!form.waiverAgreed.checked) {
+      showMessage('Please check the box agreeing to the terms before booking.', false);
+      return;
+    }
+
     submitBtn.disabled = true;
     submitBtn.textContent = 'Booking…';
 
@@ -93,6 +99,8 @@
       slot: form.slot.value,
       duration: Number(form.duration.value),
       notes: form.notes.value.trim(),
+      waiverAgreed: form.waiverAgreed.checked,
+      photoOptOut: form.photoOptOut.checked,
     };
 
     fetch('/api/bookings', {
