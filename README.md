@@ -33,6 +33,40 @@ KAYLEE_PASSCODE=your-secret npm start
 
 Bookings are saved to `data/bookings.json` (created automatically, not
 committed to git). Back that file up if you move the site to a new machine.
+The whole `data/` folder is gitignored — it also holds client accounts
+(`accounts.json`) and login sessions (`sessions.json`), which contain
+password hashes and session tokens and must never be committed.
+
+## Client accounts & login
+
+Clients can create an account at `/account.html` and, once logged in, manage:
+
+- **Account settings** — name, phone, address, and password.
+- **Dog profiles** — add multiple dogs (name, breed, age, size, photo,
+  behaviour notes, vet contact, allergies); these autofill at booking time.
+- **Bookings** — their own upcoming and past walks, pulled automatically.
+
+Authentication is real, not a front-end trick: passwords are hashed with
+scrypt, sessions are random tokens stored server-side (only their SHA-256
+hash is persisted) and delivered as `HttpOnly`, `SameSite=Lax` cookies that
+survive restarts and work across devices. Failed logins and signups are
+rate-limited per IP.
+
+### Google sign-in (optional)
+
+"Continue with Google" stays hidden until you configure OAuth. To turn it on:
+
+1. In the [Google Cloud console](https://console.cloud.google.com/), create an
+   OAuth 2.0 Client ID (type: Web application).
+2. Set the authorized redirect URI to
+   `https://YOUR-DOMAIN/api/auth/google/callback`.
+3. Set these environment variables on your host:
+   - `GOOGLE_CLIENT_ID`
+   - `GOOGLE_CLIENT_SECRET`
+   - `BASE_URL` — your deployed origin, e.g. `https://kaylees-dog-walking.onrender.com`
+
+Google sign-in needs a deployed HTTPS origin to work — it can't run on plain
+`localhost`. Email + password sign-in works everywhere with no setup.
 
 ## Business rules baked into the server
 

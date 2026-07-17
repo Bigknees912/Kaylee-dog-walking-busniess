@@ -87,6 +87,54 @@
       submitBtn.disabled = true;
     });
 
+  // Logged-in clients: prefill their contact info and offer a saved-dog
+  // picker so they don't retype anything.
+  var savedDogs = [];
+  fetch('/api/auth/me', { credentials: 'same-origin' })
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+      if (!data.account) {
+        document.getElementById('loggedout-note').hidden = false;
+        return;
+      }
+      var acct = data.account;
+      var banner = document.getElementById('loggedin-banner');
+      banner.textContent = 'Booking as ' + (acct.name || acct.email) + '. Your info is filled in below — change anything you like.';
+      banner.hidden = false;
+
+      if (!form.ownerName.value.trim()) form.ownerName.value = acct.name || '';
+      if (!form.phone.value.trim()) form.phone.value = acct.phone || '';
+      if (!form.email.value.trim()) form.email.value = acct.email || '';
+      if (!form.address.value.trim()) form.address.value = acct.address || '';
+
+      savedDogs = acct.dogs || [];
+      if (savedDogs.length > 0) {
+        var picker = document.getElementById('dog-picker');
+        savedDogs.forEach(function (dog, i) {
+          var opt = document.createElement('option');
+          opt.value = String(i);
+          opt.textContent = dog.name + (dog.breed ? ' (' + dog.breed + ')' : '');
+          picker.appendChild(opt);
+        });
+        document.getElementById('dog-picker-row').hidden = false;
+        picker.addEventListener('change', function () {
+          var dog = savedDogs[Number(picker.value)];
+          if (!dog) return;
+          form.dogName.value = dog.name || '';
+          if (dog.size) form.dogSize.value = dog.size;
+          // Fold behaviour notes + allergies into the "anything I should know"
+          // field, but never clobber something they've already typed.
+          if (!form.notes.value.trim()) {
+            var bits = [];
+            if (dog.behaviorNotes) bits.push(dog.behaviorNotes);
+            if (dog.allergies) bits.push('Allergies: ' + dog.allergies);
+            form.notes.value = bits.join('. ');
+          }
+        });
+      }
+    })
+    .catch(function () {});
+
   // Returning-client lookup: once a phone number looks complete, check if
   // we already know this owner and fill in their dog's details for them.
   let lastLookedUp = '';

@@ -25,6 +25,33 @@ const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 const NOTIFICATIONS_FILE = path.join(DATA_DIR, 'notifications.json');
 const EMAIL_TEMPLATES_FILE = path.join(DATA_DIR, 'email-templates.json');
 const EMAIL_LOG_FILE = path.join(DATA_DIR, 'email-log.json');
+const ACCOUNTS_FILE = path.join(DATA_DIR, 'accounts.json');
+const SESSIONS_FILE = path.join(DATA_DIR, 'sessions.json');
+
+// ---------------------------------------------------------------------------
+// Client accounts / authentication configuration
+// ---------------------------------------------------------------------------
+
+const SESSION_COOKIE = 'kdw_session';
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const SESSION_TTL_SEC = Math.floor(SESSION_TTL_MS / 1000);
+const MIN_PASSWORD_LENGTH = 8;
+const MAX_DOGS_PER_ACCOUNT = 20;
+const MAX_DOG_PHOTO_BYTES = 2_000_000; // ~2MB data URL cap per dog photo
+
+// Google OAuth — only active when these env vars are set. Without them the
+// "Continue with Google" button is hidden and the routes return 503. To turn
+// it on: create an OAuth 2.0 Client ID in the Google Cloud console, set the
+// authorized redirect URI to <BASE_URL>/api/auth/google/callback, then set
+// GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and BASE_URL (your deployed https
+// origin) in the environment. Email + password sign-in works without any of
+// this.
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
+const BASE_URL = (process.env.BASE_URL || `http://localhost:${PORT}`).replace(/\/$/, '');
+function googleEnabled() {
+  return Boolean(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET);
+}
 
 // ---------------------------------------------------------------------------
 // Business rules (single source of truth — the booking form reads these
@@ -78,6 +105,8 @@ let settings = { paymentMethods: { etransfer: true, cash: true, stripe: false } 
 let notifications = [];
 let emailTemplates = [];
 let emailLog = [];
+let accounts = [];
+let sessions = [];
 
 function makeStore(file, initial) {
   return {
@@ -107,6 +136,8 @@ const settingsStore = makeStore(SETTINGS_FILE, settings);
 const notificationsStore = makeStore(NOTIFICATIONS_FILE, []);
 const emailTemplatesStore = makeStore(EMAIL_TEMPLATES_FILE, []);
 const emailLogStore = makeStore(EMAIL_LOG_FILE, []);
+const accountsStore = makeStore(ACCOUNTS_FILE, []);
+const sessionsStore = makeStore(SESSIONS_FILE, []);
 
 function saveBookings() { bookingsStore.save(bookings); }
 function saveClients() { clientsStore.save(clients); }
@@ -114,6 +145,8 @@ function saveSettings() { settingsStore.save(settings); }
 function saveNotifications() { notificationsStore.save(notifications); }
 function saveEmailTemplates() { emailTemplatesStore.save(emailTemplates); }
 function saveEmailLog() { emailLogStore.save(emailLog); }
+function saveAccounts() { accountsStore.save(accounts); }
+function saveSessions() { sessionsStore.save(sessions); }
 
 const DEFAULT_EMAIL_TEMPLATES = [
   {
@@ -239,6 +272,178 @@ function requirePasscode(req, res, next) {
     return;
   }
   next();
+}
+
+// ---------------------------------------------------------------------------
+// Authentication helpers — real password hashing (scrypt), server-side
+// sessions delivered as signed-random httpOnly cookies, persisted to disk so
+// they survive restarts and work across devices. Only a SHA-256 hash of each
+// session token is stored, so a leaked sessions.json can't be used to log in.
+// ---------------------------------------------------------------------------
+
+function normalizeEmail(email) {
+  return String(email || '').trim().toLowerCase();
+}
+
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= 200;
+}
+
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const derived = crypto.scryptSync(password, salt, 64).toString('hex');
+  return `scrypt$${salt}$${derived}`;
+}
+
+function verifyPassword(password, stored) {
+  if (!stored || typeof stored !== 'string' || !stored.startsWith('scrypt$')) return false;
+  const parts = stored.split('$');
+  if (parts.length !== 3) return false;
+  const [, salt, hash] = parts;
+  let derived;
+  try {
+    derived = crypto.scryptSync(password, salt, 64).toString('hex');
+  } catch (err) {
+    return false;
+  }
+  const a = Buffer.from(hash, 'hex');
+  const b = Buffer.from(derived, 'hex');
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
+function hashToken(token) {
+  return crypto.createHash('sha256').update(String(token)).digest('hex');
+}
+
+function createSession(accountId) {
+  const token = crypto.randomBytes(32).toString('hex');
+  sessions.push({
+    tokenHash: hashToken(token),
+    accountId,
+    createdAt: Date.now(),
+    expiresAt: Date.now() + SESSION_TTL_MS,
+  });
+  saveSessions();
+  return token;
+}
+
+function findSession(token) {
+  if (!token) return null;
+  const th = hashToken(token);
+  const s = sessions.find((x) => x.tokenHash === th);
+  if (!s) return null;
+  if (s.expiresAt < Date.now()) {
+    sessions = sessions.filter((x) => x !== s);
+    saveSessions();
+    return null;
+  }
+  return s;
+}
+
+function destroySession(token) {
+  if (!token) return;
+  const th = hashToken(token);
+  const before = sessions.length;
+  sessions = sessions.filter((s) => s.tokenHash !== th);
+  if (sessions.length !== before) saveSessions();
+}
+
+function parseCookies(req) {
+  const header = req.headers.cookie || '';
+  const out = {};
+  header.split(';').forEach((part) => {
+    const idx = part.indexOf('=');
+    if (idx > -1) {
+      out[part.slice(0, idx).trim()] = decodeURIComponent(part.slice(idx + 1).trim());
+    }
+  });
+  return out;
+}
+
+function sessionToken(req) {
+  return parseCookies(req)[SESSION_COOKIE];
+}
+
+/** Build a Set-Cookie string, adding Secure only when the request is https. */
+function cookieString(req, name, value, maxAgeSec) {
+  const secure = req.secure || req.get('x-forwarded-proto') === 'https';
+  const parts = [`${name}=${value}`, 'HttpOnly', 'Path=/', 'SameSite=Lax', `Max-Age=${maxAgeSec}`];
+  if (secure) parts.push('Secure');
+  return parts.join('; ');
+}
+
+function currentAccount(req) {
+  const s = findSession(sessionToken(req));
+  if (!s) return null;
+  return accounts.find((a) => a.id === s.accountId) || null;
+}
+
+function requireAuth(req, res, next) {
+  const account = currentAccount(req);
+  if (!account) {
+    res.status(401).json({ error: 'Please log in to continue.' });
+    return;
+  }
+  req.account = account;
+  next();
+}
+
+/** Public-safe view of an account — never exposes the password hash. */
+function safeAccount(a) {
+  return {
+    id: a.id,
+    name: a.name || '',
+    email: a.email,
+    phone: a.phone || '',
+    address: a.address || '',
+    hasPassword: Boolean(a.passwordHash),
+    hasGoogle: Boolean(a.googleId),
+    dogs: Array.isArray(a.dogs) ? a.dogs : [],
+    createdAt: a.createdAt,
+  };
+}
+
+/** Validate + clamp a dog profile from user input, merging onto an existing one. */
+function sanitizeDog(input, existing) {
+  const d = existing || { id: crypto.randomUUID(), createdAt: new Date().toISOString() };
+  input = input || {};
+  if (typeof input.name === 'string') d.name = input.name.trim().slice(0, 80);
+  if (typeof input.breed === 'string') d.breed = input.breed.trim().slice(0, 80);
+  if (typeof input.age === 'string') d.age = input.age.trim().slice(0, 40);
+  if (typeof input.size === 'string') {
+    d.size = DOG_SIZES.includes(input.size) ? input.size : d.size || '';
+  }
+  if (typeof input.behaviorNotes === 'string') d.behaviorNotes = input.behaviorNotes.trim().slice(0, 1000);
+  if (typeof input.vetContact === 'string') d.vetContact = input.vetContact.trim().slice(0, 200);
+  if (typeof input.allergies === 'string') d.allergies = input.allergies.trim().slice(0, 500);
+  if (typeof input.photo === 'string') {
+    if (input.photo === '') {
+      d.photo = '';
+    } else if (
+      /^data:image\/(png|jpe?g|webp|gif);base64,/.test(input.photo) &&
+      input.photo.length <= MAX_DOG_PHOTO_BYTES
+    ) {
+      d.photo = input.photo;
+    }
+  }
+  d.updatedAt = new Date().toISOString();
+  return d;
+}
+
+/**
+ * When a new account's phone matches an existing CRM client, pull over their
+ * street address and seed a first dog profile so a returning customer's info
+ * is already there the first time they log in.
+ */
+function linkAccountToClient(account) {
+  if (!account.phone) return;
+  const client = findClientByPhone(account.phone);
+  if (!client) return;
+  if (!account.address && client.address) account.address = client.address;
+  if ((!account.dogs || account.dogs.length === 0) && client.dogName) {
+    account.dogs = [sanitizeDog({ name: client.dogName, size: client.dogSize }, undefined)];
+  }
 }
 
 /** First name, letters only, uppercased — for referral codes. */
@@ -495,7 +700,10 @@ function buildSchedule() {
 // ---------------------------------------------------------------------------
 
 const app = express();
-app.use(express.json());
+// Behind Render/other proxies, trust X-Forwarded-Proto so req.secure is
+// accurate and session cookies get the Secure flag over https.
+app.set('trust proxy', true);
+app.use(express.json({ limit: '3mb' })); // room for base64 dog photos
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/config', (req, res) => {
@@ -514,6 +722,7 @@ app.get('/api/config', (req, res) => {
     maxDogsPerWalk: MAX_DOGS_PER_WALK,
     dogSizes: DOG_SIZES,
     paymentMethods: activeMethods,
+    googleAuthEnabled: googleEnabled(),
   });
 });
 
@@ -667,8 +876,11 @@ app.post('/api/bookings', (req, res) => {
     }
   }
 
+  const bookingAccount = currentAccount(req);
+
   const booking = {
     id: crypto.randomUUID(),
+    accountId: bookingAccount ? bookingAccount.id : null,
     ownerName,
     dogName,
     dogSize,
@@ -968,6 +1180,310 @@ app.post('/api/emails/send', requirePasscode, (req, res) => {
   res.status(201).json({ ok: true, notConnected: true, queued: entries.length, entries });
 });
 
+// ---------------------------------------------------------------------------
+// Client accounts — signup / login / logout / me
+// ---------------------------------------------------------------------------
+
+app.post('/api/auth/signup', (req, res) => {
+  if (!underRateLimit('signup:' + clientIp(req), 10, 15 * 60 * 1000)) {
+    res.status(429).json({ error: 'Too many attempts — please wait a few minutes and try again.' });
+    return;
+  }
+  const body = req.body || {};
+  const email = normalizeEmail(body.email);
+  const name = String(body.name || '').trim().slice(0, 80);
+  const phone = String(body.phone || '').trim().slice(0, 25);
+  const password = String(body.password || '');
+
+  if (!name) {
+    res.status(400).json({ error: 'Please tell me your name.' });
+    return;
+  }
+  if (!isValidEmail(email)) {
+    res.status(400).json({ error: 'Please enter a valid email address.' });
+    return;
+  }
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.` });
+    return;
+  }
+  if (accounts.some((a) => a.email === email)) {
+    res.status(409).json({ error: 'An account with that email already exists — try logging in instead.' });
+    return;
+  }
+
+  const account = {
+    id: crypto.randomUUID(),
+    email,
+    name,
+    phone,
+    address: '',
+    passwordHash: hashPassword(password),
+    googleId: null,
+    dogs: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  linkAccountToClient(account);
+  accounts.push(account);
+  saveAccounts();
+
+  const token = createSession(account.id);
+  res.setHeader('Set-Cookie', cookieString(req, SESSION_COOKIE, token, SESSION_TTL_SEC));
+  res.status(201).json({ ok: true, account: safeAccount(account) });
+});
+
+app.post('/api/auth/login', (req, res) => {
+  if (!underRateLimit('login:' + clientIp(req), 15, 15 * 60 * 1000)) {
+    res.status(429).json({ error: 'Too many attempts — please wait a few minutes and try again.' });
+    return;
+  }
+  const body = req.body || {};
+  const email = normalizeEmail(body.email);
+  const password = String(body.password || '');
+
+  const account = accounts.find((a) => a.email === email);
+  // Same generic error whether the email is unknown or the password is wrong,
+  // so this can't be used to discover which emails have accounts.
+  if (!account || !verifyPassword(password, account.passwordHash)) {
+    res.status(401).json({ error: 'Wrong email or password.' });
+    return;
+  }
+
+  const token = createSession(account.id);
+  res.setHeader('Set-Cookie', cookieString(req, SESSION_COOKIE, token, SESSION_TTL_SEC));
+  res.json({ ok: true, account: safeAccount(account) });
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  destroySession(sessionToken(req));
+  res.setHeader('Set-Cookie', cookieString(req, SESSION_COOKIE, '', 0));
+  res.json({ ok: true });
+});
+
+app.get('/api/auth/me', (req, res) => {
+  const account = currentAccount(req);
+  res.json({
+    account: account ? safeAccount(account) : null,
+    googleAuthEnabled: googleEnabled(),
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Google OAuth (authorization-code flow). Inactive until GOOGLE_CLIENT_ID /
+// GOOGLE_CLIENT_SECRET / BASE_URL are configured — see the notes at the top.
+// ---------------------------------------------------------------------------
+
+app.get('/api/auth/google', (req, res) => {
+  if (!googleEnabled()) {
+    res.status(503).json({ error: "Google sign-in isn't set up yet." });
+    return;
+  }
+  const state = crypto.randomBytes(16).toString('hex');
+  res.setHeader('Set-Cookie', cookieString(req, 'kdw_gstate', state, 600));
+  const params = new URLSearchParams({
+    client_id: GOOGLE_CLIENT_ID,
+    redirect_uri: BASE_URL + '/api/auth/google/callback',
+    response_type: 'code',
+    scope: 'openid email profile',
+    state,
+    access_type: 'online',
+    prompt: 'select_account',
+  });
+  res.redirect('https://accounts.google.com/o/oauth2/v2/auth?' + params.toString());
+});
+
+app.get('/api/auth/google/callback', async (req, res) => {
+  if (!googleEnabled()) {
+    res.redirect('/account.html?error=google_unavailable');
+    return;
+  }
+  const code = req.query.code;
+  const state = req.query.state;
+  const cookies = parseCookies(req);
+  if (!code || !state || state !== cookies.kdw_gstate) {
+    res.redirect('/account.html?error=google_state');
+    return;
+  }
+  try {
+    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code: String(code),
+        client_id: GOOGLE_CLIENT_ID,
+        client_secret: GOOGLE_CLIENT_SECRET,
+        redirect_uri: BASE_URL + '/api/auth/google/callback',
+        grant_type: 'authorization_code',
+      }).toString(),
+    });
+    const tokenJson = await tokenRes.json();
+    if (!tokenJson.access_token) throw new Error('no access token from Google');
+
+    const profRes = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
+      headers: { Authorization: 'Bearer ' + tokenJson.access_token },
+    });
+    const prof = await profRes.json();
+    const email = normalizeEmail(prof.email);
+    const googleId = prof.sub;
+    const name = String(prof.name || '').slice(0, 80);
+    if (!email || !googleId) throw new Error('Google profile missing email');
+
+    let account =
+      accounts.find((a) => a.googleId === googleId) || accounts.find((a) => a.email === email);
+    if (!account) {
+      account = {
+        id: crypto.randomUUID(),
+        email,
+        name,
+        phone: '',
+        address: '',
+        passwordHash: null,
+        googleId,
+        dogs: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      linkAccountToClient(account);
+      accounts.push(account);
+    } else {
+      if (!account.googleId) account.googleId = googleId;
+      if (!account.name) account.name = name;
+      account.updatedAt = new Date().toISOString();
+    }
+    saveAccounts();
+
+    const token = createSession(account.id);
+    res.setHeader('Set-Cookie', [
+      cookieString(req, SESSION_COOKIE, token, SESSION_TTL_SEC),
+      cookieString(req, 'kdw_gstate', '', 0),
+    ]);
+    res.redirect('/account.html');
+  } catch (err) {
+    console.error('Google OAuth failed:', err.message);
+    res.redirect('/account.html?error=google_failed');
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Account settings, password, dog profiles, and the client's own bookings
+// (all require a logged-in session).
+// ---------------------------------------------------------------------------
+
+app.patch('/api/account', requireAuth, (req, res) => {
+  const body = req.body || {};
+  const account = req.account;
+  if (typeof body.name === 'string') account.name = body.name.trim().slice(0, 80);
+  if (typeof body.phone === 'string') account.phone = body.phone.trim().slice(0, 25);
+  if (typeof body.address === 'string') account.address = body.address.trim().slice(0, 120);
+  account.updatedAt = new Date().toISOString();
+  saveAccounts();
+  res.json({ ok: true, account: safeAccount(account) });
+});
+
+app.post('/api/account/password', requireAuth, (req, res) => {
+  const body = req.body || {};
+  const account = req.account;
+  const newPassword = String(body.newPassword || '');
+  if (newPassword.length < MIN_PASSWORD_LENGTH) {
+    res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.` });
+    return;
+  }
+  // If they already have a password, the current one must match. Accounts that
+  // only ever signed in with Google can set a password without a current one.
+  if (account.passwordHash) {
+    if (!verifyPassword(String(body.currentPassword || ''), account.passwordHash)) {
+      res.status(401).json({ error: 'Your current password is incorrect.' });
+      return;
+    }
+  }
+  account.passwordHash = hashPassword(newPassword);
+  account.updatedAt = new Date().toISOString();
+  saveAccounts();
+  res.json({ ok: true, account: safeAccount(account) });
+});
+
+app.get('/api/account/dogs', requireAuth, (req, res) => {
+  res.json({ dogs: req.account.dogs || [] });
+});
+
+app.post('/api/account/dogs', requireAuth, (req, res) => {
+  const account = req.account;
+  if (!Array.isArray(account.dogs)) account.dogs = [];
+  if (account.dogs.length >= MAX_DOGS_PER_ACCOUNT) {
+    res.status(400).json({ error: `You can save up to ${MAX_DOGS_PER_ACCOUNT} dogs.` });
+    return;
+  }
+  const dog = sanitizeDog(req.body || {}, undefined);
+  if (!dog.name) {
+    res.status(400).json({ error: "Please give your dog a name." });
+    return;
+  }
+  account.dogs.push(dog);
+  account.updatedAt = new Date().toISOString();
+  saveAccounts();
+  res.status(201).json({ ok: true, dog });
+});
+
+app.patch('/api/account/dogs/:id', requireAuth, (req, res) => {
+  const account = req.account;
+  const dog = (account.dogs || []).find((d) => d.id === req.params.id);
+  if (!dog) {
+    res.status(404).json({ error: 'Dog not found.' });
+    return;
+  }
+  sanitizeDog(req.body || {}, dog);
+  account.updatedAt = new Date().toISOString();
+  saveAccounts();
+  res.json({ ok: true, dog });
+});
+
+app.delete('/api/account/dogs/:id', requireAuth, (req, res) => {
+  const account = req.account;
+  const before = (account.dogs || []).length;
+  account.dogs = (account.dogs || []).filter((d) => d.id !== req.params.id);
+  if (account.dogs.length === before) {
+    res.status(404).json({ error: 'Dog not found.' });
+    return;
+  }
+  account.updatedAt = new Date().toISOString();
+  saveAccounts();
+  res.json({ ok: true });
+});
+
+app.get('/api/account/bookings', requireAuth, (req, res) => {
+  const account = req.account;
+  const key = normalizePhone(account.phone);
+  // Match this account's own bookings by accountId. Fall back to phone ONLY
+  // for bookings that aren't already tied to any account (i.e. legacy walks
+  // booked before this person had an account) — so setting your phone to a
+  // stranger's number can never surface bookings that belong to their account.
+  const mine = bookings.filter(
+    (b) => b.accountId === account.id || (!b.accountId && key && b.normalizedPhone === key)
+  );
+  const today = todayString();
+  const view = (b) => ({
+    id: b.id,
+    date: b.date,
+    slot: b.slot,
+    duration: b.duration,
+    dogName: b.dogName,
+    dogSize: b.dogSize,
+    address: b.address,
+    notes: b.notes || '',
+    status: b.status,
+  });
+  const upcoming = mine
+    .filter((b) => b.status === STATUS.BOOKED && b.date >= today)
+    .sort((a, b) => (a.date + a.slot).localeCompare(b.date + b.slot))
+    .map(view);
+  const past = mine
+    .filter((b) => !(b.status === STATUS.BOOKED && b.date >= today))
+    .sort((a, b) => (b.date + b.slot).localeCompare(a.date + a.slot))
+    .map(view);
+  res.json({ upcoming, past });
+});
+
 // Friendly 404 for unknown API routes (static pages fall through to express.static).
 app.use('/api', (req, res) => {
   res.status(404).json({ error: 'Not found.' });
@@ -983,6 +1499,15 @@ if (!Array.isArray(emailTemplates) || emailTemplates.length === 0) {
   saveEmailTemplates();
 }
 emailLog = emailLogStore.load();
+accounts = accountsStore.load();
+sessions = sessionsStore.load();
+// Drop any sessions that expired while the server was down.
+const nowMs = Date.now();
+const livingSessions = sessions.filter((s) => s.expiresAt > nowMs);
+if (livingSessions.length !== sessions.length) {
+  sessions = livingSessions;
+  saveSessions();
+}
 
 app.listen(PORT, () => {
   console.log(`Kaylee's Dog Walking Service is up at http://localhost:${PORT}`);

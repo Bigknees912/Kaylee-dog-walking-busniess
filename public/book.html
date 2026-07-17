@@ -25,6 +25,7 @@
         <a href="/about.html">About</a>
         <a href="/services.html">Services</a>
         <a href="/reviews.html">Reviews</a>
+        <a href="/account.html">My account</a>
         <a href="/book.html" class="nav-cta active">Book a walk</a>
       </nav>
     </div>
@@ -36,6 +37,16 @@
         <p class="section-kicker">let's do this</p>
         <h1>Book a walk</h1>
         <p class="sub" style="font-size:1.12rem;">Tell me about your pup and pick a time. If a neighbour on your street books the same slot, you'll both get $5 off automatically. Questions? Text me at <a href="tel:+15874332199">587-433-2199</a>.</p>
+
+        <div id="loggedin-banner" class="notice" style="margin-top:16px;" hidden></div>
+        <p id="loggedout-note" class="hint" style="margin-top:12px;" hidden>Have an account? <a href="/account.html">Log in</a> and your details fill in automatically.</p>
+
+        <div id="dog-picker-row" style="margin-top:20px;" hidden>
+          <label for="dog-picker">Use a saved dog</label>
+          <select id="dog-picker">
+            <option value="">— choose a saved dog —</option>
+          </select>
+        </div>
 
         <form id="booking-form" class="card reveal" style="margin-top:24px;" novalidate>
           <div class="form-grid">

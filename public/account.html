@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>My Account — Kaylee's Dog Walking Service</title>
+  <meta name="description" content="Sign in to manage your dogs' profiles and your dog-walking bookings with Kaylee in McKenzie Towne, Calgary.">
+  <meta name="robots" content="noindex">
+  <link rel="icon" type="image/svg+xml" href="/img/paw.svg">
+  <script>document.documentElement.classList.add('js');</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;700;800&family=Outfit:wght@400;500;600;700&family=Nothing+You+Could+Do&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="/">
+        <img src="/img/paw.svg" alt="Kaylee's Dog Walking Service paw print logo">
+        <span class="brand-name">Kaylee's Dog Walking Service<small>McKenzie Towne, Calgary</small></span>
+      </a>
+      <nav class="site-nav">
+        <a href="/">Home</a>
+        <a href="/about.html">About</a>
+        <a href="/services.html">Services</a>
+        <a href="/reviews.html">Reviews</a>
+        <a href="/account.html" class="active">My account</a>
+        <a href="/book.html" class="nav-cta">Book a walk</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="section">
+      <div class="wrap" style="max-width:820px;">
+
+        <!-- Logged-out: login / signup -->
+        <div id="auth-view" hidden>
+          <p class="section-kicker">welcome</p>
+          <h1>Your account</h1>
+          <p class="sub" style="font-size:1.1rem;">Sign in to save your dogs' profiles and see your walk history. Booking is faster when you're logged in — no retyping.</p>
+
+          <div class="auth-card card" style="max-width:460px; margin-top:20px;">
+            <div class="dash-tabs" role="tablist" aria-label="Sign in or sign up">
+              <button class="dash-tab active" data-authtab="login" type="button" role="tab" aria-selected="true">Log in</button>
+              <button class="dash-tab" data-authtab="signup" type="button" role="tab" aria-selected="false">Sign up</button>
+            </div>
+
+            <form id="login-form" class="auth-form" novalidate>
+              <label for="login-email">Email</label>
+              <input id="login-email" name="email" type="email" autocomplete="email" required>
+              <label for="login-password" style="margin-top:12px;">Password</label>
+              <input id="login-password" name="password" type="password" autocomplete="current-password" required>
+              <button class="btn btn-primary" type="submit" style="margin-top:16px; width:100%;">Log in</button>
+            </form>
+
+            <form id="signup-form" class="auth-form" novalidate hidden>
+              <label for="signup-name">Your name</label>
+              <input id="signup-name" name="name" type="text" autocomplete="name" required>
+              <label for="signup-email" style="margin-top:12px;">Email</label>
+              <input id="signup-email" name="email" type="email" autocomplete="email" required>
+              <label for="signup-phone" style="margin-top:12px;">Phone number</label>
+              <input id="signup-phone" name="phone" type="tel" autocomplete="tel">
+              <label for="signup-password" style="margin-top:12px;">Password <span class="opt">(at least 8 characters)</span></label>
+              <input id="signup-password" name="password" type="password" autocomplete="new-password" required minlength="8">
+              <button class="btn btn-primary" type="submit" style="margin-top:16px; width:100%;">Create account</button>
+            </form>
+
+            <div id="auth-msg" class="form-msg" role="alert" hidden></div>
+
+            <div id="google-block" hidden>
+              <div class="auth-divider"><span>or</span></div>
+              <a id="google-btn" class="btn btn-quiet" href="/api/auth/google" style="width:100%; text-align:center;">Continue with Google</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Logged-in: dashboard -->
+        <div id="account-view" hidden>
+          <p class="section-kicker">hi <span id="greet-name">there</span>!</p>
+          <h1>Your account</h1>
+          <div class="walk-actions" style="margin-bottom:20px;">
+            <a class="btn btn-gold btn-small" href="/book.html">Book a walk</a>
+            <button id="logout-btn" class="btn btn-quiet btn-small" type="button">Log out</button>
+          </div>
+
+          <div class="dash-tabs" role="tablist" aria-label="Account sections">
+            <button class="dash-tab active" data-tab="settings" type="button" role="tab" id="tab-settings" aria-controls="panel-settings" aria-selected="true">Account settings</button>
+            <button class="dash-tab" data-tab="dogs" type="button" role="tab" id="tab-dogs" aria-controls="panel-dogs" aria-selected="false">Dog profiles</button>
+            <button class="dash-tab" data-tab="bookings" type="button" role="tab" id="tab-bookings" aria-controls="panel-bookings" aria-selected="false">Bookings</button>
+          </div>
+
+          <!-- Account settings -->
+          <div id="panel-settings" class="dash-panel" role="tabpanel" aria-labelledby="tab-settings">
+            <div class="card" style="max-width:520px;">
+              <h3>Your details</h3>
+              <form id="details-form" novalidate>
+                <label for="acct-name">Name</label>
+                <input id="acct-name" name="name" type="text" autocomplete="name">
+                <label for="acct-phone" style="margin-top:12px;">Phone</label>
+                <input id="acct-phone" name="phone" type="tel" autocomplete="tel">
+                <label for="acct-address" style="margin-top:12px;">Street address <span class="opt">(used for bookings)</span></label>
+                <input id="acct-address" name="address" type="text" autocomplete="street-address">
+                <button class="btn btn-primary btn-small" type="submit" style="margin-top:16px;">Save details</button>
+                <div id="details-msg" class="form-msg" role="alert" hidden></div>
+              </form>
+            </div>
+
+            <div class="card" style="max-width:520px; margin-top:20px;">
+              <h3 id="password-heading">Change password</h3>
+              <form id="password-form" novalidate>
+                <div id="current-password-row">
+                  <label for="acct-current-password">Current password</label>
+                  <input id="acct-current-password" name="currentPassword" type="password" autocomplete="current-password">
+                </div>
+                <label for="acct-new-password" style="margin-top:12px;">New password <span class="opt">(at least 8 characters)</span></label>
+                <input id="acct-new-password" name="newPassword" type="password" autocomplete="new-password" minlength="8">
+                <button class="btn btn-primary btn-small" type="submit" style="margin-top:16px;">Save password</button>
+                <div id="password-msg" class="form-msg" role="alert" hidden></div>
+              </form>
+            </div>
+
+            <div class="card" style="max-width:520px; margin-top:20px;">
+              <h3>Login methods</h3>
+              <ul id="login-methods" class="login-methods"></ul>
+            </div>
+          </div>
+
+          <!-- Dog profiles -->
+          <div id="panel-dogs" class="dash-panel" role="tabpanel" aria-labelledby="tab-dogs" hidden>
+            <p class="hint">Add each of your dogs once, and their details fill in automatically every time you book.</p>
+            <div id="dogs-list" class="dogs-list"></div>
+            <button id="add-dog-btn" class="btn btn-gold btn-small" type="button" style="margin-top:12px;">+ Add a dog</button>
+          </div>
+
+          <!-- Bookings -->
+          <div id="panel-bookings" class="dash-panel" role="tabpanel" aria-labelledby="tab-bookings" hidden>
+            <h3>Upcoming walks</h3>
+            <div id="upcoming-bookings" class="bookings-list"></div>
+            <h3 style="margin-top:32px;">Past walks</h3>
+            <div id="past-bookings" class="bookings-list"></div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap foot-cols">
+      <div>
+        <a class="brand" href="/">
+          <img src="/img/paw.svg" alt="">
+          <span class="brand-name">Kaylee's Dog Walking Service<small>McKenzie Towne, Calgary</small></span>
+        </a>
+        <p class="foot-note">treats every dog like her own</p>
+      </div>
+      <div>
+        <h3>Say hi</h3>
+        <ul>
+          <li>Call or text Kaylee: <a href="tel:+15874332199">587-433-2199</a></li>
+          <li><a href="/book.html">Book a walk online</a></li>
+        </ul>
+      </div>
+      <div>
+        <h3>Service area</h3>
+        <p>McKenzie Towne, Calgary — Inverness, Prestwick, Elgin and the paths around the pond.</p>
+      </div>
+    </div>
+    <div class="wrap foot-bottom">© 2026 Kaylee's Dog Walking Service · <a href="/schedule.html">Kaylee's schedule</a></div>
+  </footer>
+
+  <!-- Template for one editable dog card -->
+  <template id="dog-card-tpl">
+    <div class="card dog-card">
+      <div class="dog-card-top">
+        <div class="dog-photo-wrap">
+          <img class="dog-photo" alt="" hidden>
+          <div class="dog-photo-empty">🐾</div>
+        </div>
+        <div class="dog-photo-actions">
+          <label class="btn btn-quiet btn-small photo-label">Photo<input type="file" class="dog-photo-input" accept="image/*" hidden></label>
+          <button type="button" class="btn btn-quiet btn-small remove-photo-btn" hidden>Remove photo</button>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div>
+          <label>Name</label>
+          <input class="dog-name" type="text" maxlength="80">
+        </div>
+        <div>
+          <label>Breed</label>
+          <input class="dog-breed" type="text" maxlength="80">
+        </div>
+        <div>
+          <label>Age</label>
+          <input class="dog-age" type="text" maxlength="40" placeholder="e.g. 3 years">
+        </div>
+        <div>
+          <label>Size</label>
+          <select class="dog-size"></select>
+        </div>
+        <div class="full">
+          <label>Behaviour notes</label>
+          <input class="dog-behavior" type="text" maxlength="1000" placeholder="e.g. scared of skateboards, great with other dogs">
+        </div>
+        <div>
+          <label>Vet contact</label>
+          <input class="dog-vet" type="text" maxlength="200" placeholder="clinic + phone">
+        </div>
+        <div>
+          <label>Allergies</label>
+          <input class="dog-allergies" type="text" maxlength="500" placeholder="e.g. chicken">
+        </div>
+      </div>
+      <div class="walk-actions" style="margin-top:12px;">
+        <button type="button" class="btn btn-primary btn-small save-dog-btn">Save</button>
+        <button type="button" class="btn btn-danger btn-small delete-dog-btn">Delete</button>
+        <span class="dog-card-msg"></span>
+      </div>
+    </div>
+  </template>
+
+  <script src="/js/account.js"></script>
+</body>
+</html>
