@@ -54,6 +54,22 @@
               <label for="login-password" style="margin-top:12px;">Password</label>
               <input id="login-password" name="password" type="password" autocomplete="current-password" required>
               <button class="btn btn-primary" type="submit" style="margin-top:16px; width:100%;">Log in</button>
+              <p class="hint" style="margin-top:10px;"><a href="#" id="forgot-link">Forgot your password?</a></p>
+            </form>
+
+            <form id="forgot-form" class="auth-form" novalidate hidden>
+              <p class="hint">Enter your account email and we'll get you a reset link (valid for 1 hour).</p>
+              <label for="forgot-email">Email</label>
+              <input id="forgot-email" name="email" type="email" autocomplete="email" required>
+              <button class="btn btn-primary" type="submit" style="margin-top:16px; width:100%;">Send reset link</button>
+              <p class="hint" style="margin-top:10px;"><a href="#" id="forgot-back-link">Back to log in</a></p>
+            </form>
+
+            <form id="reset-form" class="auth-form" novalidate hidden>
+              <p class="hint">Choose a new password for your account.</p>
+              <label for="reset-password">New password <span class="opt">(at least 8 characters)</span></label>
+              <input id="reset-password" name="newPassword" type="password" autocomplete="new-password" required minlength="8">
+              <button class="btn btn-primary" type="submit" style="margin-top:16px; width:100%;">Save new password</button>
             </form>
 
             <form id="signup-form" class="auth-form" novalidate hidden>
@@ -125,6 +141,13 @@
             <div class="card" style="max-width:520px; margin-top:20px;">
               <h3>Login methods</h3>
               <ul id="login-methods" class="login-methods"></ul>
+            </div>
+
+            <div class="card" style="max-width:520px; margin-top:20px;">
+              <h3>Going away for a while?</h3>
+              <p class="hint" id="pause-note">Pausing keeps all your dogs and walk history — you just won't show as an active client until you're back. Booking a walk automatically un-pauses you.</p>
+              <button id="pause-btn" class="btn btn-quiet btn-small" type="button">Pause my account</button>
+              <div id="pause-msg" class="form-msg" role="alert" hidden></div>
             </div>
           </div>
 

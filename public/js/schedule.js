@@ -206,6 +206,20 @@
         renderWalks(body.walks);
         latestWalks = body.walks;
         if (!document.getElementById('panel-calendar').hidden) renderCalendar();
+        if (!siteConfig) loadConfig();
+        // Coming back from the Google Calendar OAuth redirect: jump to the
+        // Calendar tab and show the outcome.
+        if (window.__gcalFlash) {
+          const flash = window.__gcalFlash;
+          window.__gcalFlash = null;
+          const calTab = document.querySelector('.dash-tab[data-tab=calendar]');
+          if (calTab) calTab.click();
+          if (gcalMsg) {
+            gcalMsg.textContent = flash;
+            gcalMsg.className = 'form-msg ' + (flash.indexOf('connected') === 0 || flash.indexOf('Google Calendar connected') === 0 ? 'ok' : 'err');
+            gcalMsg.hidden = false;
+          }
+        }
       })
       .catch(() => showGate('Could not reach the server — is it running?'));
   }
@@ -233,7 +247,7 @@
       Object.keys(dashPanels).forEach((key) => {
         dashPanels[key].hidden = key !== target;
       });
-      if (target === 'calendar') renderCalendar();
+      if (target === 'calendar') { renderCalendar(); loadGcalStatus(); }
       if (target === 'clients') loadClients();
       if (target === 'payments') loadPaymentSettings();
       if (target === 'messages') loadMessages();
@@ -371,6 +385,9 @@
     );
     if (c.pendingCreditCents) {
       card.appendChild(el('div', 'client-credit', '$' + (c.pendingCreditCents / 100).toFixed(0) + ' referral credit owed'));
+    }
+    if (c.paused) {
+      card.appendChild(el('div', 'client-credit', '⏸ Account paused — away for now'));
     }
 
     const tagRow = el('div', 'tag-row');
@@ -663,7 +680,9 @@
           cb.value = c.id;
           cb.style.margin = '0';
           label.appendChild(cb);
-          label.appendChild(document.createTextNode(c.ownerName + ' (' + c.dogName + ')'));
+          label.appendChild(
+            document.createTextNode(c.ownerName + ' (' + c.dogName + ')' + (c.paused ? ' — paused' : ''))
+          );
           holder.appendChild(label);
         });
       })
@@ -716,6 +735,233 @@
         });
     });
   }
+
+  // ----- shared config for the admin forms -----
+
+  let siteConfig = null;
+  function loadConfig() {
+    return fetch('/api/config')
+      .then((r) => r.json())
+      .then((cfg) => {
+        siteConfig = cfg;
+        fillAdminSelects();
+      })
+      .catch(() => {});
+  }
+
+  function fillOptions(select, items, makeOption, placeholderText) {
+    if (!select) return;
+    select.innerHTML = '';
+    const ph = document.createElement('option');
+    ph.value = '';
+    ph.textContent = placeholderText || 'Choose…';
+    if (placeholderText !== 'none-required') select.appendChild(ph);
+    items.forEach((item) => select.appendChild(makeOption(item)));
+  }
+
+  function fillAdminSelects() {
+    if (!siteConfig) return;
+    const sizeOpt = (s) => { const o = document.createElement('option'); o.value = s; o.textContent = s; return o; };
+    fillOptions(document.getElementById('aw-size'), siteConfig.dogSizes, sizeOpt);
+    fillOptions(document.getElementById('ac-size'), siteConfig.dogSizes, sizeOpt);
+    fillOptions(document.getElementById('aw-slot'), siteConfig.slots, sizeOpt);
+    fillOptions(
+      document.getElementById('aw-duration'),
+      siteConfig.durations,
+      (d) => {
+        const o = document.createElement('option');
+        o.value = String(d.minutes);
+        o.textContent = d.minutes + ' minutes — ' + dollars(d.priceCents);
+        return o;
+      }
+    );
+    const awDate = document.getElementById('aw-date');
+    if (awDate) awDate.min = new Date().toISOString().slice(0, 10);
+  }
+
+  // ----- admin: add a walk manually -----
+
+  const adminWalkForm = document.getElementById('admin-walk-form');
+  if (adminWalkForm) {
+    adminWalkForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const msgEl = document.getElementById('aw-msg');
+      const btn = adminWalkForm.querySelector('button[type=submit]');
+      btn.disabled = true;
+      api('/api/admin/bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ownerName: document.getElementById('aw-owner').value.trim(),
+          phone: document.getElementById('aw-phone').value.trim(),
+          dogName: document.getElementById('aw-dog').value.trim(),
+          dogSize: document.getElementById('aw-size').value,
+          address: document.getElementById('aw-address').value.trim(),
+          date: document.getElementById('aw-date').value,
+          slot: document.getElementById('aw-slot').value,
+          duration: Number(document.getElementById('aw-duration').value),
+          notes: document.getElementById('aw-notes').value.trim(),
+        }),
+      })
+        .then(({ ok, body }) => {
+          msgEl.textContent = ok ? 'Walk added! ' + (body.note || '') : body.error || 'Could not add the walk.';
+          msgEl.className = 'form-msg ' + (ok ? 'ok' : 'err');
+          msgEl.hidden = false;
+          if (ok) {
+            adminWalkForm.reset();
+            fillAdminSelects();
+            loadSchedule();
+          }
+        })
+        .catch(() => {
+          msgEl.textContent = 'Could not reach the server — please try again.';
+          msgEl.className = 'form-msg err';
+          msgEl.hidden = false;
+        })
+        .finally(() => { btn.disabled = false; });
+    });
+  }
+
+  // ----- admin: add a client manually -----
+
+  const adminClientForm = document.getElementById('admin-client-form');
+  if (adminClientForm) {
+    adminClientForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const msgEl = document.getElementById('ac-msg');
+      const btn = adminClientForm.querySelector('button[type=submit]');
+      btn.disabled = true;
+      api('/api/admin/clients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ownerName: document.getElementById('ac-owner').value.trim(),
+          phone: document.getElementById('ac-phone').value.trim(),
+          email: document.getElementById('ac-email').value.trim(),
+          dogName: document.getElementById('ac-dog').value.trim(),
+          dogSize: document.getElementById('ac-size').value,
+          address: document.getElementById('ac-address').value.trim(),
+          notes: document.getElementById('ac-notes').value.trim(),
+        }),
+      })
+        .then(({ ok, body }) => {
+          msgEl.textContent = ok ? 'Client added!' : body.error || 'Could not add the client.';
+          msgEl.className = 'form-msg ' + (ok ? 'ok' : 'err');
+          msgEl.hidden = false;
+          if (ok) {
+            adminClientForm.reset();
+            fillAdminSelects();
+            loadClients();
+          }
+        })
+        .catch(() => {
+          msgEl.textContent = 'Could not reach the server — please try again.';
+          msgEl.className = 'form-msg err';
+          msgEl.hidden = false;
+        })
+        .finally(() => { btn.disabled = false; });
+    });
+  }
+
+  // ----- Google Calendar panel -----
+
+  const gcalStatusText = document.getElementById('gcal-status-text');
+  const gcalConnectBtn = document.getElementById('gcal-connect-btn');
+  const gcalSyncBtn = document.getElementById('gcal-sync-btn');
+  const gcalDisconnectBtn = document.getElementById('gcal-disconnect-btn');
+  const gcalMsg = document.getElementById('gcal-msg');
+
+  function loadGcalStatus() {
+    if (!gcalStatusText) return;
+    api('/api/gcal/status')
+      .then(({ ok, body }) => {
+        if (!ok) {
+          gcalStatusText.textContent = body.error || 'Could not check the Google Calendar connection.';
+          return;
+        }
+        gcalConnectBtn.hidden = true;
+        gcalSyncBtn.hidden = true;
+        gcalDisconnectBtn.hidden = true;
+        if (!body.configured) {
+          gcalStatusText.textContent =
+            'Not configured yet: this needs Google Cloud credentials (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET) with the Calendar API enabled — see the README. Nothing here is faked: once the credentials are set, Connect appears and every booking syncs to your real calendar.';
+          return;
+        }
+        if (!body.connected) {
+          gcalStatusText.textContent =
+            'Ready to connect. You’ll be sent to Google to allow calendar access, then every new booking creates an event automatically.';
+          gcalConnectBtn.hidden = false;
+          gcalConnectBtn.href = '/api/gcal/connect?passcode=' + encodeURIComponent(passcode);
+          return;
+        }
+        gcalStatusText.textContent =
+          'Connected as ' + (body.email || 'your Google account') +
+          (body.lastSyncAt ? ' · last synced ' + new Date(body.lastSyncAt).toLocaleString('en-CA') : '') +
+          (body.lastError ? ' · last error: ' + body.lastError : '') +
+          '. Walks sync both ways: bookings create events, and deleting or moving an event in Google Calendar updates the walk here on the next sync.';
+        gcalSyncBtn.hidden = false;
+        gcalDisconnectBtn.hidden = false;
+      })
+      .catch(() => {
+        gcalStatusText.textContent = 'Could not reach the server.';
+      });
+  }
+
+  if (gcalSyncBtn) {
+    gcalSyncBtn.addEventListener('click', () => {
+      gcalSyncBtn.disabled = true;
+      gcalSyncBtn.textContent = 'Syncing…';
+      api('/api/gcal/sync', { method: 'POST' })
+        .then(({ ok, body }) => {
+          if (ok) {
+            const s = body.summary || {};
+            gcalMsg.textContent =
+              'Synced — ' + (s.created || 0) + ' event(s) created, ' +
+              (s.movedFromCalendar || 0) + ' walk(s) moved from calendar, ' +
+              (s.cancelledFromCalendar || 0) + ' cancelled from calendar, ' +
+              (s.pushedBack || 0) + ' pushed back to calendar.';
+            gcalMsg.className = 'form-msg ok';
+            loadSchedule();
+          } else {
+            gcalMsg.textContent = body.error || 'Sync failed.';
+            gcalMsg.className = 'form-msg err';
+          }
+          gcalMsg.hidden = false;
+          loadGcalStatus();
+        })
+        .catch(() => {
+          gcalMsg.textContent = 'Could not reach the server.';
+          gcalMsg.className = 'form-msg err';
+          gcalMsg.hidden = false;
+        })
+        .finally(() => {
+          gcalSyncBtn.disabled = false;
+          gcalSyncBtn.textContent = 'Sync now';
+        });
+    });
+  }
+
+  if (gcalDisconnectBtn) {
+    gcalDisconnectBtn.addEventListener('click', () => {
+      if (!window.confirm('Disconnect Google Calendar? Existing events stay on your calendar but stop syncing.')) return;
+      api('/api/gcal/disconnect', { method: 'POST' }).then(() => loadGcalStatus());
+    });
+  }
+
+  // Surface the result of an OAuth redirect (?gcal=connected / failed / ...).
+  (function () {
+    const params = new URLSearchParams(window.location.search);
+    const flag = params.get('gcal');
+    if (!flag) return;
+    history.replaceState(null, '', '/schedule.html');
+    const messages = {
+      connected: 'Google Calendar connected! Your upcoming walks are syncing now.',
+      failed: 'Google Calendar connection failed — please try again.',
+      state_error: 'Google Calendar connection could not be verified — please try again.',
+      unavailable: 'Google Calendar is not configured on the server yet.',
+    };
+    window.__gcalFlash = messages[flag] || null;
+  })();
 
   gateForm.addEventListener('submit', (event) => {
     event.preventDefault();

@@ -27,6 +27,10 @@ const EMAIL_TEMPLATES_FILE = path.join(DATA_DIR, 'email-templates.json');
 const EMAIL_LOG_FILE = path.join(DATA_DIR, 'email-log.json');
 const ACCOUNTS_FILE = path.join(DATA_DIR, 'accounts.json');
 const SESSIONS_FILE = path.join(DATA_DIR, 'sessions.json');
+const GCAL_FILE = path.join(DATA_DIR, 'gcal.json');
+
+// Walks live in Kaylee's local timezone regardless of where the server runs.
+const CAL_TIMEZONE = 'America/Edmonton';
 
 // ---------------------------------------------------------------------------
 // Client accounts / authentication configuration
@@ -107,6 +111,7 @@ let emailTemplates = [];
 let emailLog = [];
 let accounts = [];
 let sessions = [];
+let gcal = { refreshToken: null, accessToken: null, accessTokenExpiry: 0, email: '', lastSyncAt: null, lastError: null };
 
 function makeStore(file, initial) {
   return {
@@ -138,6 +143,7 @@ const emailTemplatesStore = makeStore(EMAIL_TEMPLATES_FILE, []);
 const emailLogStore = makeStore(EMAIL_LOG_FILE, []);
 const accountsStore = makeStore(ACCOUNTS_FILE, []);
 const sessionsStore = makeStore(SESSIONS_FILE, []);
+const gcalStore = makeStore(GCAL_FILE, gcal);
 
 function saveBookings() { bookingsStore.save(bookings); }
 function saveClients() { clientsStore.save(clients); }
@@ -147,6 +153,7 @@ function saveEmailTemplates() { emailTemplatesStore.save(emailTemplates); }
 function saveEmailLog() { emailLogStore.save(emailLog); }
 function saveAccounts() { accountsStore.save(accounts); }
 function saveSessions() { sessionsStore.save(sessions); }
+function saveGcal() { gcalStore.save(gcal); }
 
 const DEFAULT_EMAIL_TEMPLATES = [
   {
@@ -399,9 +406,21 @@ function safeAccount(a) {
     address: a.address || '',
     hasPassword: Boolean(a.passwordHash),
     hasGoogle: Boolean(a.googleId),
+    paused: Boolean(a.paused),
     dogs: Array.isArray(a.dogs) ? a.dogs : [],
     createdAt: a.createdAt,
   };
+}
+
+/** Tell Kaylee (via the dashboard notification log) that a client changed a dog profile. */
+function notifyDogChange(account, verb, dogName) {
+  queueNotification({
+    bookingId: null,
+    type: 'profile-update',
+    to: 'Kaylee (dashboard)',
+    message: `${account.name || account.email} (${account.phone || 'no phone'}) ${verb} dog profile: ${dogName || 'unnamed'}.`,
+    scheduledFor: new Date().toISOString(),
+  });
 }
 
 /** Validate + clamp a dog profile from user input, merging onto an existing one. */
@@ -444,6 +463,263 @@ function linkAccountToClient(account) {
   if ((!account.dogs || account.dogs.length === 0) && client.dogName) {
     account.dogs = [sanitizeDog({ name: client.dogName, size: client.dogSize }, undefined)];
   }
+}
+
+// ---------------------------------------------------------------------------
+// Booking conflict rules — shared by the public form, Kaylee's manual add,
+// and the Google Calendar pull-sync so every path enforces the same schedule.
+// Returns { status, error } or null when the slot works.
+// ---------------------------------------------------------------------------
+
+function findBookingConflict({ date, slot, duration, phone, dogName, ignoreId }) {
+  const normPhone = normalizePhone(phone);
+  const others = bookings.filter((b) => isActive(b) && b.id !== ignoreId);
+
+  const duplicate = others.find(
+    (b) => b.date === date && b.slot === slot && b.normalizedPhone === normPhone
+  );
+  if (duplicate) {
+    return {
+      status: 409,
+      error: `Looks like ${dogName || 'this dog'} is already booked for ${date} at ${slot}. If you need to change something, text Kaylee at 587-433-2199.`,
+    };
+  }
+
+  const sameSlot = others.filter((b) => b.date === date && b.slot === slot);
+  if (sameSlot.length >= MAX_DOGS_PER_WALK) {
+    return {
+      status: 409,
+      error: `That time is already full — three dogs is my max for one walk! Please pick another slot and I'll see you then.`,
+    };
+  }
+  const differentLength = sameSlot.find((b) => b.duration !== duration);
+  if (differentLength) {
+    return {
+      status: 409,
+      error: `That slot already has a ${differentLength.duration}-minute walk booked. Pick the ${differentLength.duration}-minute option to join it, or choose a different time.`,
+    };
+  }
+
+  // A walk's actual duration can run into the next slot — block anything
+  // that would put Kaylee in two places at once, across walk groups.
+  const newStart = slotToMinutes(slot);
+  const newEnd = newStart + duration;
+  const seen = new Set();
+  for (const other of others) {
+    if (other.date !== date) continue;
+    const key = walkKey(other);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (other.slot === slot && other.duration === duration) continue;
+    const otherStart = slotToMinutes(other.slot);
+    if (otherStart === null || newStart === null) continue;
+    const otherEnd = otherStart + other.duration;
+    if (newStart < otherEnd && otherStart < newEnd) {
+      return {
+        status: 409,
+        error: `That overlaps with a walk already booked at ${other.slot} (${other.duration} min) — Kaylee can't be two places at once! Please pick a time that doesn't overlap.`,
+      };
+    }
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Google Calendar sync (Kaylee's own calendar).
+// Uses the same GOOGLE_CLIENT_ID/SECRET as Google sign-in, with the
+// calendar.events scope and an offline refresh token stored in data/gcal.json.
+// Bookings push events on create/done/cancel; gcalPullSync() pulls
+// calendar-side deletions and moves back into the app.
+// ---------------------------------------------------------------------------
+
+async function gcalAccessToken() {
+  if (!gcal.refreshToken || !googleEnabled()) return null;
+  if (gcal.accessToken && gcal.accessTokenExpiry > Date.now() + 60_000) {
+    return gcal.accessToken;
+  }
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      refresh_token: gcal.refreshToken,
+      client_id: GOOGLE_CLIENT_ID,
+      client_secret: GOOGLE_CLIENT_SECRET,
+      grant_type: 'refresh_token',
+    }).toString(),
+  });
+  const json = await res.json();
+  if (!json.access_token) {
+    throw new Error('Google token refresh failed: ' + (json.error || res.status));
+  }
+  gcal.accessToken = json.access_token;
+  gcal.accessTokenExpiry = Date.now() + (json.expires_in || 3600) * 1000;
+  saveGcal();
+  return gcal.accessToken;
+}
+
+async function gcalApi(method, pathname, body) {
+  const token = await gcalAccessToken();
+  if (!token) throw new Error('Google Calendar is not connected');
+  const res = await fetch('https://www.googleapis.com/calendar/v3' + pathname, {
+    method,
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (res.status === 204) return {};
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(
+      'Google Calendar API ' + res.status + ': ' + ((json.error && json.error.message) || 'request failed')
+    );
+    err.status = res.status;
+    throw err;
+  }
+  return json;
+}
+
+function bookingEventBody(b) {
+  const pad = (n) => String(n).padStart(2, '0');
+  const startMin = slotToMinutes(b.slot);
+  const endMin = startMin + b.duration;
+  const stamp = (min) => `${b.date}T${pad(Math.floor(min / 60))}:${pad(min % 60)}:00`;
+  return {
+    summary: (b.status === STATUS.DONE ? '✓ ' : '') + `Dog walk: ${b.dogName} (${b.duration} min)`,
+    description:
+      `Owner: ${b.ownerName}\nPhone: ${b.phone}\nDog: ${b.dogName} — ${b.dogSize}` +
+      (b.notes ? `\nNotes: ${b.notes}` : '') +
+      `\n\nBooked via Kaylee's Dog Walking Service`,
+    location: b.address,
+    start: { dateTime: stamp(startMin), timeZone: CAL_TIMEZONE },
+    end: { dateTime: stamp(endMin), timeZone: CAL_TIMEZONE },
+  };
+}
+
+/** Fire-and-forget wrapper: calendar hiccups must never break a booking. */
+function gcalPush(fn) {
+  Promise.resolve()
+    .then(fn)
+    .catch((err) => {
+      gcal.lastError = err.message;
+      saveGcal();
+      console.error('Google Calendar sync:', err.message);
+    });
+}
+
+function gcalOnBookingCreated(booking) {
+  if (!gcal.refreshToken) return;
+  gcalPush(async () => {
+    const ev = await gcalApi('POST', '/calendars/primary/events', bookingEventBody(booking));
+    if (ev && ev.id) {
+      booking.gcalEventId = ev.id;
+      saveBookings();
+    }
+  });
+}
+
+function gcalOnBookingStatusChange(booking) {
+  if (!gcal.refreshToken || !booking.gcalEventId) return;
+  gcalPush(async () => {
+    if (booking.status === STATUS.CANCELLED) {
+      try {
+        await gcalApi('DELETE', '/calendars/primary/events/' + booking.gcalEventId);
+      } catch (err) {
+        if (err.status !== 404 && err.status !== 410) throw err;
+      }
+      booking.gcalEventId = null;
+      saveBookings();
+    } else {
+      await gcalApi('PATCH', '/calendars/primary/events/' + booking.gcalEventId, bookingEventBody(booking));
+    }
+  });
+}
+
+/** An event's RFC3339 start → { date, minutes } in Kaylee's timezone. */
+function edmontonParts(iso) {
+  const d = new Date(iso);
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone: CAL_TIMEZONE,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  });
+  const parts = Object.fromEntries(fmt.formatToParts(d).map((p) => [p.type, p.value]));
+  return {
+    date: `${parts.year}-${parts.month}-${parts.day}`,
+    minutes: (Number(parts.hour) % 24) * 60 + Number(parts.minute),
+  };
+}
+
+function slotForMinutes(min) {
+  return TIME_SLOTS.find((s) => slotToMinutes(s) === min) || null;
+}
+
+/**
+ * Two-way pull: for every active upcoming booking, make sure a calendar
+ * event exists; adopt calendar-side deletions (cancel the booking) and moves
+ * (update the booking when the new time maps to a valid free slot, otherwise
+ * push the app's time back to the calendar — the schedule's rules win).
+ */
+async function gcalPullSync() {
+  const summary = { created: 0, cancelledFromCalendar: 0, movedFromCalendar: 0, pushedBack: 0 };
+  if (!gcal.refreshToken) return summary;
+  const today = todayString();
+  let dirty = false;
+
+  for (const b of bookings) {
+    if (!isActive(b) || b.date < today) continue;
+
+    if (!b.gcalEventId) {
+      const ev = await gcalApi('POST', '/calendars/primary/events', bookingEventBody(b));
+      if (ev && ev.id) {
+        b.gcalEventId = ev.id;
+        summary.created += 1;
+        dirty = true;
+      }
+      continue;
+    }
+
+    let ev;
+    try {
+      ev = await gcalApi('GET', '/calendars/primary/events/' + b.gcalEventId);
+    } catch (err) {
+      if (err.status === 404 || err.status === 410) ev = null;
+      else throw err;
+    }
+
+    if (!ev || ev.status === 'cancelled') {
+      b.status = STATUS.CANCELLED;
+      b.gcalEventId = null;
+      summary.cancelledFromCalendar += 1;
+      dirty = true;
+      continue;
+    }
+
+    if (ev.start && ev.start.dateTime) {
+      const p = edmontonParts(ev.start.dateTime);
+      const slot = slotForMinutes(p.minutes);
+      const moved = p.date !== b.date || (slot && slot !== b.slot) || (!slot && true);
+      if (moved) {
+        const fits =
+          slot &&
+          isValidDateString(p.date) &&
+          !findBookingConflict({ date: p.date, slot, duration: b.duration, phone: b.phone, dogName: b.dogName, ignoreId: b.id });
+        if (fits) {
+          b.date = p.date;
+          b.slot = slot;
+          summary.movedFromCalendar += 1;
+          dirty = true;
+        } else {
+          await gcalApi('PATCH', '/calendars/primary/events/' + b.gcalEventId, bookingEventBody(b));
+          summary.pushedBack += 1;
+        }
+      }
+    }
+  }
+
+  if (dirty) saveBookings();
+  gcal.lastSyncAt = new Date().toISOString();
+  gcal.lastError = null;
+  saveGcal();
+  return summary;
 }
 
 /** First name, letters only, uppercased — for referral codes. */
@@ -806,63 +1082,17 @@ app.post('/api/bookings', (req, res) => {
     return;
   }
 
-  // Guard against duplicate submissions (double-click, a retried request, or
-  // an intentional repeat) — the same dog can't book the identical slot twice.
-  const duplicate = bookings.find(
-    (b) =>
-      isActive(b) &&
-      b.date === date &&
-      b.slot === slot &&
-      b.normalizedPhone === normalizePhone(phone)
-  );
-  if (duplicate) {
-    res.status(409).json({
-      error: `Looks like ${dogName} is already booked for ${date} at ${slot}. If you need to change something, text Kaylee at 587-433-2199.`,
-    });
+  // Duplicate, capacity, duration-mismatch, and overlap rules — shared with
+  // Kaylee's manual add and the Google Calendar pull-sync.
+  const conflict = findBookingConflict({ date, slot, duration, phone, dogName });
+  if (conflict) {
+    res.status(conflict.status).json({ error: conflict.error });
     return;
   }
 
-  // Kaylee can only be in one place at a time: a slot holds one walk of up
-  // to three dogs, and every dog in it walks for the same length.
   const sameSlot = bookings.filter(
     (b) => isActive(b) && b.date === date && b.slot === slot
   );
-  if (sameSlot.length >= MAX_DOGS_PER_WALK) {
-    res.status(409).json({
-      error: `That time is already full — three dogs is my max for one walk! Please pick another slot and I'll see you then.`,
-    });
-    return;
-  }
-  const differentLength = sameSlot.find((b) => b.duration !== duration);
-  if (differentLength) {
-    res.status(409).json({
-      error: `That slot already has a ${differentLength.duration}-minute walk booked. Pick the ${differentLength.duration}-minute option to join it, or choose a different time.`,
-    });
-    return;
-  }
-
-  // A walk's actual duration can run into the next slot (e.g. a 60-minute
-  // walk at 6:00 PM runs until 7:00 PM) — block anything that would put
-  // Kaylee in two places at once, even across different walk groups.
-  const newStart = slotToMinutes(slot);
-  const newEnd = newStart + duration;
-  const otherWalksOnDate = new Map();
-  for (const b of bookings) {
-    if (!isActive(b) || b.date !== date) continue;
-    otherWalksOnDate.set(walkKey(b), b);
-  }
-  for (const other of otherWalksOnDate.values()) {
-    if (other.slot === slot && other.duration === duration) continue; // same walk group, already handled above
-    const otherStart = slotToMinutes(other.slot);
-    const otherEnd = otherStart + other.duration;
-    if (otherStart === null || newStart === null) continue;
-    if (newStart < otherEnd && otherStart < newEnd) {
-      res.status(409).json({
-        error: `That overlaps with a walk already booked at ${other.slot} (${other.duration} min) — Kaylee can't be two places at once! Please pick a time that doesn't overlap.`,
-      });
-      return;
-    }
-  }
 
   let referralDiscountCents = 0;
   let referralApplied = false;
@@ -919,6 +1149,17 @@ app.post('/api/bookings', (req, res) => {
 
   bookings.push(booking);
   saveBookings();
+  gcalOnBookingCreated(booking);
+
+  // Booking a walk is the clearest possible "I'm back" — unpause the account.
+  if (bookingAccount && bookingAccount.paused) {
+    bookingAccount.paused = false;
+    saveAccounts();
+    if (client && client.paused) {
+      client.paused = false;
+      saveClients();
+    }
+  }
 
   const joinedNeighbours = sameSlot.some(
     (b) => normalizeStreet(b.address) === normalizeStreet(address)
@@ -994,6 +1235,7 @@ app.patch('/api/bookings/:id', requirePasscode, (req, res) => {
 
   booking.status = action === 'done' ? STATUS.DONE : STATUS.CANCELLED;
   saveBookings();
+  gcalOnBookingStatusChange(booking);
 
   if (action === 'done') {
     const client = findClientByPhone(booking.phone);
@@ -1422,6 +1664,7 @@ app.post('/api/account/dogs', requireAuth, (req, res) => {
   account.dogs.push(dog);
   account.updatedAt = new Date().toISOString();
   saveAccounts();
+  notifyDogChange(account, 'added a', dog.name);
   res.status(201).json({ ok: true, dog });
 });
 
@@ -1435,19 +1678,21 @@ app.patch('/api/account/dogs/:id', requireAuth, (req, res) => {
   sanitizeDog(req.body || {}, dog);
   account.updatedAt = new Date().toISOString();
   saveAccounts();
+  notifyDogChange(account, 'updated the', dog.name);
   res.json({ ok: true, dog });
 });
 
 app.delete('/api/account/dogs/:id', requireAuth, (req, res) => {
   const account = req.account;
-  const before = (account.dogs || []).length;
+  const removed = (account.dogs || []).find((d) => d.id === req.params.id);
   account.dogs = (account.dogs || []).filter((d) => d.id !== req.params.id);
-  if (account.dogs.length === before) {
+  if (!removed) {
     res.status(404).json({ error: 'Dog not found.' });
     return;
   }
   account.updatedAt = new Date().toISOString();
   saveAccounts();
+  notifyDogChange(account, 'removed the', removed.name);
   res.json({ ok: true });
 });
 
@@ -1484,6 +1729,358 @@ app.get('/api/account/bookings', requireAuth, (req, res) => {
   res.json({ upcoming, past });
 });
 
+// ---------------------------------------------------------------------------
+// Google Calendar connection (Kaylee only — passcode protected).
+// Needs the same Google Cloud OAuth client as sign-in, with the extra
+// redirect URI <BASE_URL>/api/gcal/callback authorized and the Calendar API
+// enabled on the project. Until GOOGLE_CLIENT_ID/SECRET are set these
+// routes report "not configured" rather than pretending to work.
+// ---------------------------------------------------------------------------
+
+app.get('/api/gcal/status', requirePasscode, (req, res) => {
+  res.json({
+    configured: googleEnabled(),
+    connected: Boolean(gcal.refreshToken),
+    email: gcal.email || '',
+    lastSyncAt: gcal.lastSyncAt,
+    lastError: gcal.lastError,
+  });
+});
+
+app.get('/api/gcal/connect', requirePasscode, (req, res) => {
+  if (!googleEnabled()) {
+    res.status(503).json({ error: 'Google credentials are not configured yet — see the README.' });
+    return;
+  }
+  const state = crypto.randomBytes(16).toString('hex');
+  res.setHeader('Set-Cookie', cookieString(req, 'kdw_calstate', state, 600));
+  const params = new URLSearchParams({
+    client_id: GOOGLE_CLIENT_ID,
+    redirect_uri: BASE_URL + '/api/gcal/callback',
+    response_type: 'code',
+    scope: 'https://www.googleapis.com/auth/calendar.events openid email',
+    state,
+    access_type: 'offline',
+    prompt: 'consent', // force a refresh token even on re-connect
+  });
+  res.redirect('https://accounts.google.com/o/oauth2/v2/auth?' + params.toString());
+});
+
+app.get('/api/gcal/callback', async (req, res) => {
+  if (!googleEnabled()) {
+    res.redirect('/schedule.html?gcal=unavailable');
+    return;
+  }
+  const code = req.query.code;
+  const state = req.query.state;
+  if (!code || !state || state !== parseCookies(req).kdw_calstate) {
+    res.redirect('/schedule.html?gcal=state_error');
+    return;
+  }
+  try {
+    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code: String(code),
+        client_id: GOOGLE_CLIENT_ID,
+        client_secret: GOOGLE_CLIENT_SECRET,
+        redirect_uri: BASE_URL + '/api/gcal/callback',
+        grant_type: 'authorization_code',
+      }).toString(),
+    });
+    const tokenJson = await tokenRes.json();
+    if (!tokenJson.refresh_token && !tokenJson.access_token) {
+      throw new Error('no tokens from Google');
+    }
+    if (tokenJson.refresh_token) gcal.refreshToken = tokenJson.refresh_token;
+    gcal.accessToken = tokenJson.access_token || null;
+    gcal.accessTokenExpiry = Date.now() + (tokenJson.expires_in || 3600) * 1000;
+
+    if (tokenJson.access_token) {
+      const profRes = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
+        headers: { Authorization: 'Bearer ' + tokenJson.access_token },
+      });
+      const prof = await profRes.json();
+      if (prof.email) gcal.email = prof.email;
+    }
+    gcal.lastError = null;
+    saveGcal();
+
+    // First sync in the background so existing upcoming walks get events.
+    gcalPush(() => gcalPullSync());
+
+    res.setHeader('Set-Cookie', cookieString(req, 'kdw_calstate', '', 0));
+    res.redirect('/schedule.html?gcal=connected');
+  } catch (err) {
+    console.error('Google Calendar connect failed:', err.message);
+    res.redirect('/schedule.html?gcal=failed');
+  }
+});
+
+app.post('/api/gcal/disconnect', requirePasscode, (req, res) => {
+  gcal = { refreshToken: null, accessToken: null, accessTokenExpiry: 0, email: '', lastSyncAt: null, lastError: null };
+  saveGcal();
+  res.json({ ok: true });
+});
+
+app.post('/api/gcal/sync', requirePasscode, async (req, res) => {
+  if (!gcal.refreshToken) {
+    res.status(409).json({ error: 'Google Calendar is not connected.' });
+    return;
+  }
+  try {
+    const summary = await gcalPullSync();
+    res.json({ ok: true, summary });
+  } catch (err) {
+    gcal.lastError = err.message;
+    saveGcal();
+    res.status(502).json({ error: 'Sync failed: ' + err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Password reset. No email provider is connected yet, so the reset link is
+// queued into the email log — Kaylee can open Messages and text the link to
+// the client. Once a provider is wired into the email queue, this flow
+// delivers automatically with no further changes.
+// ---------------------------------------------------------------------------
+
+app.post('/api/auth/forgot', (req, res) => {
+  if (!underRateLimit('forgot:' + clientIp(req), 5, 15 * 60 * 1000)) {
+    res.status(429).json({ error: 'Too many attempts — please wait a few minutes and try again.' });
+    return;
+  }
+  const email = normalizeEmail((req.body || {}).email);
+  // Always the same response, so this can't be used to discover accounts.
+  const generic = {
+    ok: true,
+    message: "If that email has an account, a reset link is on its way. It's valid for 1 hour.",
+  };
+  const account = accounts.find((a) => a.email === email);
+  if (!account) {
+    res.json(generic);
+    return;
+  }
+
+  const token = crypto.randomBytes(24).toString('hex');
+  account.resetTokenHash = hashToken(token);
+  account.resetTokenExpiry = Date.now() + 60 * 60 * 1000;
+  saveAccounts();
+
+  const link = `${BASE_URL}/account.html?reset=${token}`;
+  emailLog.push({
+    id: crypto.randomUUID(),
+    templateId: 'password-reset',
+    clientId: null,
+    to: `${account.name || 'Client'} <${account.email}>`,
+    subject: 'Reset your Kaylee’s Dog Walking password',
+    body:
+      `Hi ${account.name || 'there'},\n\nSomeone asked to reset the password for this account. ` +
+      `If that was you, open this link within 1 hour:\n\n${link}\n\n` +
+      `If it wasn't you, you can ignore this — your password is unchanged.`,
+    status: 'queued — not sent (no email provider connected)',
+    createdAt: new Date().toISOString(),
+  });
+  saveEmailLog();
+  queueNotification({
+    bookingId: null,
+    type: 'password-reset',
+    to: 'Kaylee (dashboard)',
+    message: `${account.name || account.email} requested a password reset. No email provider is connected, so open the Messages tab, copy the reset link from the email log, and text it to them.`,
+    scheduledFor: new Date().toISOString(),
+  });
+
+  res.json(generic);
+});
+
+app.post('/api/auth/reset', (req, res) => {
+  if (!underRateLimit('reset:' + clientIp(req), 10, 15 * 60 * 1000)) {
+    res.status(429).json({ error: 'Too many attempts — please wait a few minutes and try again.' });
+    return;
+  }
+  const body = req.body || {};
+  const token = String(body.token || '');
+  const newPassword = String(body.newPassword || '');
+  if (newPassword.length < MIN_PASSWORD_LENGTH) {
+    res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.` });
+    return;
+  }
+  const th = hashToken(token);
+  const account = accounts.find(
+    (a) => a.resetTokenHash === th && a.resetTokenExpiry && a.resetTokenExpiry > Date.now()
+  );
+  if (!account) {
+    res.status(400).json({ error: 'That reset link is invalid or has expired — request a new one.' });
+    return;
+  }
+  account.passwordHash = hashPassword(newPassword);
+  account.resetTokenHash = null;
+  account.resetTokenExpiry = null;
+  account.updatedAt = new Date().toISOString();
+  saveAccounts();
+
+  // A reset means the old password may be compromised — sign out everywhere,
+  // then start a fresh session for this browser.
+  sessions = sessions.filter((s) => s.accountId !== account.id);
+  saveSessions();
+  const sessionTok = createSession(account.id);
+  res.setHeader('Set-Cookie', cookieString(req, SESSION_COOKIE, sessionTok, SESSION_TTL_SEC));
+  res.json({ ok: true, account: safeAccount(account) });
+});
+
+// ---------------------------------------------------------------------------
+// Admin manual add (Kaylee only) — for phone and in-person bookings that
+// never touch the public form, and for adding a client directly.
+// ---------------------------------------------------------------------------
+
+app.post('/api/admin/bookings', requirePasscode, (req, res) => {
+  const body = req.body || {};
+  const ownerName = String(body.ownerName || '').trim();
+  const dogName = String(body.dogName || '').trim();
+  const dogSize = String(body.dogSize || '').trim();
+  const phone = String(body.phone || '').trim();
+  const address = String(body.address || '').trim();
+  const date = String(body.date || '').trim();
+  const slot = String(body.slot || '').trim();
+  const duration = Number(body.duration);
+  const notes = String(body.notes || '').trim().slice(0, 500);
+
+  const problems = [];
+  if (!ownerName) problems.push('owner name');
+  if (!dogName) problems.push('dog name');
+  if (!DOG_SIZES.includes(dogSize)) problems.push('dog size');
+  if (phone.replace(/\D/g, '').length < 7) problems.push('phone');
+  if (!address || !normalizeStreet(address)) problems.push('address');
+  if (!isValidDateString(date)) problems.push('date');
+  if (!TIME_SLOTS.includes(slot)) problems.push('time slot');
+  if (!PRICES[duration]) problems.push('walk length');
+  if (problems.length > 0) {
+    res.status(400).json({ error: `Missing or invalid: ${problems.join(', ')}.` });
+    return;
+  }
+  if (date < todayString()) {
+    res.status(400).json({ error: 'That date has already passed.' });
+    return;
+  }
+  const conflict = findBookingConflict({ date, slot, duration, phone, dogName });
+  if (conflict) {
+    res.status(conflict.status).json({ error: conflict.error });
+    return;
+  }
+
+  const booking = {
+    id: crypto.randomUUID(),
+    accountId: null,
+    source: 'manual-admin',
+    ownerName,
+    dogName,
+    dogSize,
+    phone,
+    email: '',
+    normalizedPhone: normalizePhone(phone),
+    address,
+    date,
+    slot,
+    duration,
+    notes,
+    dogBirthday: '',
+    // Recorded by Kaylee, not the client — the waiver wasn't checked online.
+    vaccinatedAgreed: false,
+    waiverAgreed: false,
+    waiverAgreedAt: null,
+    photoConsent: true,
+    referralCodeUsed: null,
+    referralDiscountCents: 0,
+    status: STATUS.BOOKED,
+    createdAt: new Date().toISOString(),
+  };
+
+  upsertClientForBooking({ ownerName, dogName, dogSize, phone, email: '', address, dogBirthday: '', referralCode: '' });
+  bookings.push(booking);
+  saveBookings();
+  gcalOnBookingCreated(booking);
+
+  queueNotification({
+    bookingId: booking.id,
+    type: 'confirmation',
+    to: phone,
+    message: `Hi ${ownerName}, ${dogName}'s walk is booked for ${date} at ${slot} (${duration} min). — Kaylee`,
+    scheduledFor: booking.createdAt,
+  });
+  queueNotification({
+    bookingId: booking.id,
+    type: 'reminder',
+    to: phone,
+    message: `Hi ${ownerName}, just a reminder — ${dogName}'s walk with Kaylee is today at ${slot}!`,
+    scheduledFor: reminderTimeFor(date),
+  });
+
+  res.status(201).json({ ok: true, id: booking.id, note: 'Remember to cover the waiver with them in person — this booking is marked as manually added.' });
+});
+
+app.post('/api/admin/clients', requirePasscode, (req, res) => {
+  const body = req.body || {};
+  const ownerName = String(body.ownerName || '').trim();
+  const phone = String(body.phone || '').trim();
+  if (!ownerName || phone.replace(/\D/g, '').length < 7) {
+    res.status(400).json({ error: 'A name and a valid phone number are required.' });
+    return;
+  }
+  if (findClientByPhone(phone)) {
+    res.status(409).json({ error: 'A client with that phone number already exists.' });
+    return;
+  }
+  const client = {
+    id: crypto.randomUUID(),
+    normalizedPhone: normalizePhone(phone),
+    phone,
+    email: String(body.email || '').trim().slice(0, 200),
+    ownerName,
+    dogName: String(body.dogName || '').trim().slice(0, 80),
+    dogSize: DOG_SIZES.includes(body.dogSize) ? body.dogSize : '',
+    address: String(body.address || '').trim().slice(0, 120),
+    dogBirthday: String(body.dogBirthday || '').trim().slice(0, 60),
+    notes: String(body.notes || '').trim().slice(0, 2000),
+    tags: ['new'],
+    referralCode: generateReferralCode(ownerName, phone),
+    referredByClientId: null,
+    pendingCreditCents: 0,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  clients.push(client);
+  saveClients();
+  res.status(201).json({ ok: true, client });
+});
+
+// ---------------------------------------------------------------------------
+// Pause / resume account (client). Paused clients stay in the CRM with all
+// their history — they're just flagged so Kaylee knows they're away.
+// ---------------------------------------------------------------------------
+
+app.post('/api/account/pause', requireAuth, (req, res) => {
+  const paused = (req.body || {}).paused === true;
+  const account = req.account;
+  account.paused = paused;
+  account.updatedAt = new Date().toISOString();
+  saveAccounts();
+  const client = findClientByPhone(account.phone);
+  if (client) {
+    client.paused = paused;
+    client.updatedAt = new Date().toISOString();
+    saveClients();
+  }
+  queueNotification({
+    bookingId: null,
+    type: 'account-status',
+    to: 'Kaylee (dashboard)',
+    message: `${account.name || account.email} ${paused ? 'paused their account (away for a while)' : 'resumed their account'}.`,
+    scheduledFor: new Date().toISOString(),
+  });
+  res.json({ ok: true, account: safeAccount(account) });
+});
+
 // Friendly 404 for unknown API routes (static pages fall through to express.static).
 app.use('/api', (req, res) => {
   res.status(404).json({ error: 'Not found.' });
@@ -1501,6 +2098,7 @@ if (!Array.isArray(emailTemplates) || emailTemplates.length === 0) {
 emailLog = emailLogStore.load();
 accounts = accountsStore.load();
 sessions = sessionsStore.load();
+gcal = Object.assign(gcal, gcalStore.load());
 // Drop any sessions that expired while the server was down.
 const nowMs = Date.now();
 const livingSessions = sessions.filter((s) => s.expiresAt > nowMs);

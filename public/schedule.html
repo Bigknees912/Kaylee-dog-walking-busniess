@@ -67,10 +67,72 @@
 
           <div id="panel-list" class="dash-panel" role="tabpanel" aria-labelledby="tab-list">
             <p class="hint">Bookings with the same date, time and walk length are grouped into one walk (up to three dogs) and sorted by street for an efficient route. Neighbour and referral discounts apply automatically.</p>
+
+            <details class="liability-details" style="margin-bottom:20px;">
+              <summary>+ Add a walk manually (phone or in-person booking)</summary>
+              <div class="liability-body">
+                <form id="admin-walk-form" novalidate>
+                  <div class="form-grid">
+                    <div>
+                      <label for="aw-owner">Owner name</label>
+                      <input id="aw-owner" type="text" maxlength="80" required>
+                    </div>
+                    <div>
+                      <label for="aw-phone">Phone</label>
+                      <input id="aw-phone" type="tel" maxlength="25" required>
+                    </div>
+                    <div>
+                      <label for="aw-dog">Dog's name</label>
+                      <input id="aw-dog" type="text" maxlength="80" required>
+                    </div>
+                    <div>
+                      <label for="aw-size">Dog's size</label>
+                      <select id="aw-size" required></select>
+                    </div>
+                    <div class="full">
+                      <label for="aw-address">Street address</label>
+                      <input id="aw-address" type="text" maxlength="120" required>
+                    </div>
+                    <div>
+                      <label for="aw-date">Date</label>
+                      <input id="aw-date" type="date" required>
+                    </div>
+                    <div>
+                      <label for="aw-slot">Time slot</label>
+                      <select id="aw-slot" required></select>
+                    </div>
+                    <div>
+                      <label for="aw-duration">Walk length</label>
+                      <select id="aw-duration" required></select>
+                    </div>
+                    <div>
+                      <label for="aw-notes">Notes <span class="opt">(optional)</span></label>
+                      <input id="aw-notes" type="text" maxlength="500">
+                    </div>
+                    <div class="full">
+                      <button class="btn btn-primary btn-small" type="submit">Add walk</button>
+                    </div>
+                  </div>
+                  <div id="aw-msg" class="form-msg" role="alert" hidden></div>
+                  <p class="hint" style="margin-top:10px;">Manual bookings skip the online waiver — remember to cover it with the client in person.</p>
+                </form>
+              </div>
+            </details>
+
             <div id="walks"></div>
           </div>
 
           <div id="panel-calendar" class="dash-panel" role="tabpanel" aria-labelledby="tab-calendar" hidden>
+            <div class="card" style="margin-bottom:22px;">
+              <h3>Google Calendar</h3>
+              <p class="hint" id="gcal-status-text">Checking connection…</p>
+              <div class="walk-actions">
+                <a id="gcal-connect-btn" class="btn btn-primary btn-small" hidden>Connect Google Calendar</a>
+                <button id="gcal-sync-btn" class="btn btn-quiet btn-small" type="button" hidden>Sync now</button>
+                <button id="gcal-disconnect-btn" class="btn btn-danger btn-small" type="button" hidden>Disconnect</button>
+              </div>
+              <div id="gcal-msg" class="form-msg" role="alert" hidden></div>
+            </div>
             <div class="cal-nav">
               <button id="cal-prev" class="btn btn-quiet btn-small" type="button">← Previous week</button>
               <div id="cal-range" class="cal-range"></div>
@@ -81,6 +143,49 @@
 
           <div id="panel-clients" class="dash-panel" role="tabpanel" aria-labelledby="tab-clients" hidden>
             <p class="hint">Every client who has booked a walk, with their contact info, tags, notes, and booking history.</p>
+
+            <details class="liability-details" style="margin-bottom:20px;">
+              <summary>+ Add a client manually</summary>
+              <div class="liability-body">
+                <form id="admin-client-form" novalidate>
+                  <div class="form-grid">
+                    <div>
+                      <label for="ac-owner">Owner name</label>
+                      <input id="ac-owner" type="text" maxlength="80" required>
+                    </div>
+                    <div>
+                      <label for="ac-phone">Phone</label>
+                      <input id="ac-phone" type="tel" maxlength="25" required>
+                    </div>
+                    <div>
+                      <label for="ac-email">Email <span class="opt">(optional)</span></label>
+                      <input id="ac-email" type="email" maxlength="200">
+                    </div>
+                    <div>
+                      <label for="ac-dog">Dog's name <span class="opt">(optional)</span></label>
+                      <input id="ac-dog" type="text" maxlength="80">
+                    </div>
+                    <div>
+                      <label for="ac-size">Dog's size <span class="opt">(optional)</span></label>
+                      <select id="ac-size"></select>
+                    </div>
+                    <div>
+                      <label for="ac-address">Street address <span class="opt">(optional)</span></label>
+                      <input id="ac-address" type="text" maxlength="120">
+                    </div>
+                    <div class="full">
+                      <label for="ac-notes">Notes <span class="opt">(optional)</span></label>
+                      <input id="ac-notes" type="text" maxlength="2000">
+                    </div>
+                    <div class="full">
+                      <button class="btn btn-primary btn-small" type="submit">Add client</button>
+                    </div>
+                  </div>
+                  <div id="ac-msg" class="form-msg" role="alert" hidden></div>
+                </form>
+              </div>
+            </details>
+
             <div id="clients-list" class="clients-list"></div>
           </div>
 

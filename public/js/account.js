@@ -55,6 +55,19 @@
       .then(function (cfg) { dogSizes = cfg.dogSizes || []; })
       .catch(function () {});
 
+    // A reset link (?reset=TOKEN) takes priority: show the new-password form.
+    var resetToken = params.get('reset');
+    if (resetToken) {
+      history.replaceState(null, '', '/account.html');
+      show(authView);
+      hide(loginForm);
+      hide(signupForm);
+      show(resetForm);
+      document.querySelectorAll('[data-authtab]').forEach(function (t) { t.hidden = true; });
+      resetForm.dataset.token = resetToken;
+      return;
+    }
+
     j('/api/auth/me').then(function (r) {
       if (r.body && r.body.googleAuthEnabled) show(document.getElementById('google-block'));
       if (r.body && r.body.account) {
@@ -74,15 +87,71 @@
   var authTabs = document.querySelectorAll('[data-authtab]');
   var loginForm = document.getElementById('login-form');
   var signupForm = document.getElementById('signup-form');
+  var forgotForm = document.getElementById('forgot-form');
+  var resetForm = document.getElementById('reset-form');
   authTabs.forEach(function (tab) {
     tab.addEventListener('click', function () {
       authTabs.forEach(function (t) { t.classList.remove('active'); t.setAttribute('aria-selected', 'false'); });
       tab.classList.add('active');
       tab.setAttribute('aria-selected', 'true');
       authMsg.hidden = true;
+      hide(forgotForm);
+      hide(resetForm);
       if (tab.dataset.authtab === 'login') { show(loginForm); hide(signupForm); }
       else { hide(loginForm); show(signupForm); }
     });
+  });
+
+  // ----- forgot / reset password -----
+
+  document.getElementById('forgot-link').addEventListener('click', function (e) {
+    e.preventDefault();
+    authMsg.hidden = true;
+    hide(loginForm);
+    show(forgotForm);
+  });
+  document.getElementById('forgot-back-link').addEventListener('click', function (e) {
+    e.preventDefault();
+    authMsg.hidden = true;
+    hide(forgotForm);
+    show(loginForm);
+  });
+
+  forgotForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var btn = forgotForm.querySelector('button[type=submit]');
+    btn.disabled = true;
+    j('/api/auth/forgot', {
+      method: 'POST',
+      body: JSON.stringify({ email: document.getElementById('forgot-email').value.trim() }),
+    }).then(function (r) {
+      setMsg(authMsg, (r.body && (r.body.message || r.body.error)) || 'Check your messages for a reset link.', r.ok);
+    }).catch(function () {
+      setMsg(authMsg, 'Could not reach the server — please try again.', false);
+    }).finally(function () { btn.disabled = false; });
+  });
+
+  resetForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var btn = resetForm.querySelector('button[type=submit]');
+    btn.disabled = true;
+    j('/api/auth/reset', {
+      method: 'POST',
+      body: JSON.stringify({
+        token: resetForm.dataset.token || '',
+        newPassword: document.getElementById('reset-password').value,
+      }),
+    }).then(function (r) {
+      if (r.ok) {
+        account = r.body.account;
+        hide(resetForm);
+        enterAccount();
+      } else {
+        setMsg(authMsg, r.body.error || 'Could not reset your password.', false);
+      }
+    }).catch(function () {
+      setMsg(authMsg, 'Could not reach the server — please try again.', false);
+    }).finally(function () { btn.disabled = false; });
   });
 
   loginForm.addEventListener('submit', function (e) {
@@ -131,6 +200,7 @@
     document.getElementById('greet-name').textContent = (account.name || 'there').split(' ')[0];
     fillDetails();
     renderLoginMethods();
+    renderPauseState();
     loadDogs();
     loadBookings();
   }
@@ -230,6 +300,36 @@
         setMsg(msg, 'Password saved!', true);
       } else setMsg(msg, r.body.error || 'Could not save password.', false);
     }).catch(function () { setMsg(msg, 'Could not reach the server.', false); });
+  });
+
+  // ----- pause / resume -----
+
+  var pauseBtn = document.getElementById('pause-btn');
+
+  function renderPauseState() {
+    pauseBtn.textContent = account.paused ? 'Resume my account' : 'Pause my account';
+    document.getElementById('pause-note').textContent = account.paused
+      ? "Your account is paused — Kaylee knows you're away. All your dogs and history are safe. Resume any time, or just book a walk."
+      : "Pausing keeps all your dogs and walk history — you just won't show as an active client until you're back. Booking a walk automatically un-pauses you.";
+  }
+
+  pauseBtn.addEventListener('click', function () {
+    var msg = document.getElementById('pause-msg');
+    pauseBtn.disabled = true;
+    j('/api/account/pause', {
+      method: 'POST',
+      body: JSON.stringify({ paused: !account.paused }),
+    }).then(function (r) {
+      if (r.ok) {
+        account = r.body.account;
+        renderPauseState();
+        setMsg(msg, account.paused ? 'Account paused — enjoy the trip!' : 'Welcome back! Your account is active again.', true);
+      } else {
+        setMsg(msg, r.body.error || 'Could not update your account.', false);
+      }
+    }).catch(function () {
+      setMsg(msg, 'Could not reach the server.', false);
+    }).finally(function () { pauseBtn.disabled = false; });
   });
 
   // ----- dog profiles -----

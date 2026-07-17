@@ -68,6 +68,54 @@ rate-limited per IP.
 Google sign-in needs a deployed HTTPS origin to work — it can't run on plain
 `localhost`. Email + password sign-in works everywhere with no setup.
 
+### Password reset
+
+Clients can request a reset link from the login screen. Tokens are single-use,
+stored hashed, and expire after 1 hour; a successful reset signs the account
+out everywhere. Because no email provider is connected yet, the reset email is
+queued into the dashboard's **Messages** tab — Kaylee copies the link and
+texts it to the client. Once an email provider is wired into the email queue,
+delivery becomes automatic with no code changes to this flow.
+
+## Google Calendar sync (Kaylee's dashboard)
+
+The dashboard's Calendar tab can connect to Kaylee's real Google Calendar:
+
+- Every new booking (online or manually added) creates a calendar event with
+  the dog's name, owner, phone, address, and duration.
+- Marking a walk **done** updates the event (✓ prefix); **cancelling** removes it.
+- **Sync now** pulls changes back the other way: deleting an event in Google
+  Calendar cancels the walk here, and moving an event moves the booking — if
+  the new time maps to a valid free slot; otherwise the app's time wins and
+  the event is pushed back.
+
+Setup (same Google Cloud project as sign-in):
+
+1. Enable the **Google Calendar API** on the project.
+2. On the OAuth client, add a second authorized redirect URI:
+   `https://YOUR-DOMAIN/api/gcal/callback`.
+3. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `BASE_URL` (as for
+   sign-in). Then open the dashboard → Calendar tab → **Connect Google
+   Calendar** and approve access.
+
+The refresh token lives in `data/gcal.json` (gitignored). Until the
+credentials are configured, the Calendar tab says so plainly — nothing is
+faked.
+
+## Admin extras
+
+- **Add a walk manually** (List tab) — for phone or in-person bookings; same
+  capacity/overlap rules as the public form, marked `source: manual-admin`,
+  and flagged to cover the waiver in person.
+- **Add a client manually** (Clients tab) — for people met at the park who
+  haven't booked yet.
+- **Dog-profile change alerts** — when a client adds, edits, or removes a dog
+  in their account, a note appears in the Messages tab so Kaylee sees changes
+  without checking manually.
+- **Pause account** — clients going away can pause from their account page;
+  they keep all history, show as "⏸ paused" in the CRM and email lists, and
+  automatically un-pause the next time they book.
+
 ## Business rules baked into the server
 
 - Prices: 30 min = $20, 60 min = $35 (`PRICES` in `server.js`)
