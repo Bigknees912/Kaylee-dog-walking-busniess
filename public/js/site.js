@@ -1,16 +1,41 @@
-/* Shared interactions: scroll-reveal animations and the pop-up gallery
-   lightbox. Loaded on every page. */
+/* Shared interactions: intro reveal, scroll-triggered animations (first
+   pass only), word-by-word headline reveals, hero parallax, nav bar that
+   turns solid on scroll, and the pop-up gallery lightbox.
+   Every entrance animation stays under 600ms and everything here backs
+   off when the user prefers reduced motion. */
 
 (function () {
-  // ----- scroll reveal -----
-  var revealed = document.querySelectorAll('.reveal');
-  if ('IntersectionObserver' in window && revealed.length > 0) {
+  var reducedMotion =
+    window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ----- word-by-word headline reveals -----
+  // Split marked headlines into per-word spans with a small stagger. The
+  // stagger is capped so the whole headline finishes within ~600ms.
+  var wordBlocks = document.querySelectorAll('.reveal-words');
+  if (!reducedMotion) {
+    wordBlocks.forEach(function (node) {
+      var words = node.textContent.split(/\s+/).filter(Boolean);
+      node.textContent = '';
+      words.forEach(function (word, i) {
+        var span = document.createElement('span');
+        span.className = 'w';
+        span.textContent = word;
+        span.style.setProperty('--wd', Math.min(i * 45, 300) + 'ms');
+        node.appendChild(span);
+        if (i < words.length - 1) node.appendChild(document.createTextNode(' '));
+      });
+    });
+  }
+
+  // ----- scroll reveal (runs once per element, never on re-scroll) -----
+  var revealed = document.querySelectorAll('.reveal, .reveal-words');
+  if (!reducedMotion && 'IntersectionObserver' in window && revealed.length > 0) {
     var observer = new IntersectionObserver(
       function (entries) {
         entries.forEach(function (entry) {
           if (entry.isIntersecting) {
             entry.target.classList.add('in');
-            observer.unobserve(entry.target);
+            observer.unobserve(entry.target); // first viewport entry only
           }
         });
       },
@@ -20,34 +45,63 @@
       observer.observe(node);
     });
   } else {
-    // No observer support: just show everything.
+    // Reduced motion or no observer support: show everything immediately.
     revealed.forEach(function (node) {
       node.classList.add('in');
     });
   }
 
-  // ----- hero ripple parallax -----
+  // ----- hero parallax (background drifts slower than the foreground) -----
   var ripple = document.getElementById('hero-ripple');
-  var reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (ripple && !reducedMotion) {
-    var ticking = false;
+    var parallaxTick = false;
     var updateParallax = function () {
       var y = window.scrollY || window.pageYOffset || 0;
       var shift = Math.min(y * 0.18, 120);
-      ripple.style.transform = 'translateY(' + shift + 'px) scale(' + (1 + Math.min(y * 0.0002, 0.08)) + ')';
-      ticking = false;
+      ripple.style.transform =
+        'translateY(' + shift + 'px) scale(' + (1 + Math.min(y * 0.0002, 0.08)) + ')';
+      parallaxTick = false;
     };
     window.addEventListener(
       'scroll',
       function () {
-        if (!ticking) {
+        if (!parallaxTick) {
           window.requestAnimationFrame(updateParallax);
-          ticking = true;
+          parallaxTick = true;
         }
       },
       { passive: true }
     );
     updateParallax();
+  }
+
+  // ----- nav bar: transparent over the hero, solid + shadow once scrolled -----
+  var header = document.querySelector('.site-header');
+  var hero = document.querySelector('.hero');
+  if (header && hero) {
+    var headerTick = false;
+    var syncHeader = function () {
+      var y = window.scrollY || window.pageYOffset || 0;
+      if (y > 24) {
+        header.classList.add('scrolled');
+        header.classList.remove('transparent');
+      } else {
+        header.classList.add('transparent');
+        header.classList.remove('scrolled');
+      }
+      headerTick = false;
+    };
+    window.addEventListener(
+      'scroll',
+      function () {
+        if (!headerTick) {
+          window.requestAnimationFrame(syncHeader);
+          headerTick = true;
+        }
+      },
+      { passive: true }
+    );
+    syncHeader();
   }
 
   // ----- lightbox for pop-up pictures -----

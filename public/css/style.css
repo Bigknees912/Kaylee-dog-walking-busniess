@@ -682,19 +682,19 @@ img { max-width: 100%; }
 
 html.js .reveal {
   opacity: 0;
-  transform: translateY(28px);
-  transition: opacity 0.7s ease, transform 0.7s var(--ease-out);
+  transform: translateY(22px);
+  transition: opacity 0.5s ease, transform 0.55s var(--ease-out);
   transition-delay: var(--d, 0s);
 }
 
 html.js .reveal-pop {
-  transform: translateY(24px) scale(0.9);
-  transition: opacity 0.6s ease, transform 0.6s var(--ease-pop);
+  transform: translateY(20px) scale(0.92);
+  transition: opacity 0.45s ease, transform 0.5s var(--ease-pop);
 }
 
 html.js .reveal-photo {
-  transform: scale(0.92);
-  transition: opacity 0.8s ease, transform 0.8s var(--ease-out);
+  transform: translateY(16px) scale(0.95);
+  transition: opacity 0.5s ease, transform 0.55s var(--ease-out);
 }
 
 html.js .reveal.in {
@@ -702,15 +702,78 @@ html.js .reveal.in {
   transform: none;
 }
 
+/* ---------- word-by-word headline reveal ---------- */
+
+html.js .reveal-words .w {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(0.4em);
+  transition: opacity 0.3s ease, transform 0.3s var(--ease-out);
+  transition-delay: var(--wd, 0s);
+}
+
+html.js .reveal-words.in .w {
+  opacity: 1;
+  transform: none;
+}
+
+/* ---------- intro reveal on page load (~0.5s, gentle rise) ---------- */
+/* fill-mode backwards: hidden during the delay, no lingering fill after,
+   so hover transforms still work once the intro finishes. */
+
+html.js .hero-anim > * { animation: intro-rise 0.5s var(--ease-out) backwards; }
+html.js .hero-anim > *:nth-child(2) { animation-delay: 0.05s; }
+html.js .hero-anim > *:nth-child(3) { animation-delay: 0.1s; }
+html.js .hero-anim > *:nth-child(4) { animation-delay: 0.15s; }
+html.js .hero-art { animation: intro-rise 0.5s var(--ease-out) 0.1s backwards; }
+html.js .brand img { animation: intro-logo 0.5s var(--ease-pop) backwards; }
+
+@keyframes intro-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes intro-logo {
+  from { opacity: 0; transform: rotate(-14deg) scale(0.7); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---------- nav bar over the hero ---------- */
+
+html.js .site-header {
+  transition: background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+html.js .site-header.transparent {
+  background: transparent;
+  border-bottom-color: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+html.js .site-header.scrolled {
+  box-shadow: 0 8px 24px rgba(14, 46, 43, 0.08);
+}
+
 @media (prefers-reduced-motion: reduce) {
   html.js .reveal,
   html.js .reveal-pop,
-  html.js .reveal-photo {
+  html.js .reveal-photo,
+  html.js .reveal-words .w {
     opacity: 1;
     transform: none;
     transition: none;
   }
+  html.js .hero-anim > *,
+  html.js .hero-art,
+  html.js .brand img {
+    animation: none;
+  }
+  body { animation: none; }
+  .marquee-track { animation: none; }
+  .hero-art .paw-badge { animation: none; }
   .hero-ripple { display: none; }
+  html { scroll-behavior: auto; }
 }
 
 /* ---------- pricing ---------- */
