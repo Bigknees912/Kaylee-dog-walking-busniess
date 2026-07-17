@@ -40,6 +40,11 @@
         <form id="booking-form" class="card reveal" style="margin-top:24px;" novalidate>
           <div class="form-grid">
             <div>
+              <label for="phone">Your phone number</label>
+              <input id="phone" name="phone" type="tel" autocomplete="tel" required maxlength="25" placeholder="e.g. 403-555-0123">
+              <p class="hint" id="returning-hint" hidden>Welcome back! I've filled in your details from last time — feel free to change anything.</p>
+            </div>
+            <div>
               <label for="ownerName">Your name</label>
               <input id="ownerName" name="ownerName" type="text" autocomplete="name" required maxlength="80" placeholder="e.g. Jordan Miller">
             </div>
@@ -52,10 +57,6 @@
               <select id="dogSize" name="dogSize" required>
                 <option value="" disabled selected>Choose…</option>
               </select>
-            </div>
-            <div>
-              <label for="phone">Your phone number</label>
-              <input id="phone" name="phone" type="tel" autocomplete="tel" required maxlength="25" placeholder="e.g. 403-555-0123">
             </div>
             <div class="full">
               <label for="address">Street address</label>
@@ -79,20 +80,36 @@
               </select>
             </div>
             <div>
+              <label for="referralCode">Referral code <span class="opt">(optional)</span></label>
+              <input id="referralCode" name="referralCode" type="text" maxlength="20" placeholder="e.g. CASEY2222">
+              <p class="hint">Got a code from a neighbour? You both get $10 credit.</p>
+            </div>
+            <div class="full">
               <label for="notes">Anything I should know? <span class="opt">(optional)</span></label>
               <input id="notes" name="notes" type="text" maxlength="500" placeholder="e.g. scared of skateboards">
             </div>
+            <div class="full" id="payment-methods-note" hidden>
+              <p class="hint">Payment accepted: <strong id="payment-methods-list"></strong></p>
+            </div>
             <div class="full">
-              <div class="waiver-box">
-                <p><strong>By booking a walk, I confirm</strong> my dog is up to date on vaccinations, is not aggressive toward people or other dogs, and I am the dog's owner or authorized to arrange this walk on their behalf. I understand walks may include time with other dogs in a group. I release Kaylee's Dog Walking Service and Kaylee from liability for injury, loss, or property damage that occurs during a walk, except in cases of gross negligence. I consent to photos of my dog being taken during walks and used for the business's marketing, unless I opt out below. I understand payment is due at the time of the walk or as otherwise agreed.</p>
-              </div>
-              <label class="checkbox-row">
-                <input id="waiverAgreed" name="waiverAgreed" type="checkbox" required>
-                <span>I agree to the terms above</span>
+              <details class="liability-details">
+                <summary>Read the full terms &amp; liability waiver</summary>
+                <div class="liability-body">
+                  <p><strong>By booking a walk, I confirm</strong> my dog is up to date on vaccinations, is not aggressive toward people or other dogs, and I am the dog's owner or authorized to arrange this walk on their behalf. I understand walks may include time with other dogs in a group.</p>
+                  <p>I release Kaylee's Dog Walking Service and Kaylee from liability for injury, loss, or property damage that occurs during a walk, except in cases of gross negligence. I consent to photos of my dog being taken during walks and used for the business's marketing, unless I opt out below. I understand payment is due at the time of the walk or as otherwise agreed.</p>
+                </div>
+              </details>
+              <label class="checkbox-row" style="margin-top:14px;">
+                <input id="vaccinatedAgreed" name="vaccinatedAgreed" type="checkbox" required>
+                <span>I confirm my dog is vaccinated and not aggressive toward people or other dogs, and I'm authorized to book this walk</span>
               </label>
               <label class="checkbox-row">
-                <input id="photoOptOut" name="photoOptOut" type="checkbox">
-                <span>Please don't use photos of my dog for marketing</span>
+                <input id="waiverAgreed" name="waiverAgreed" type="checkbox" required>
+                <span>I've read and agree to the full terms &amp; liability waiver above</span>
+              </label>
+              <label class="checkbox-row">
+                <input id="photoConsent" name="photoConsent" type="checkbox" checked>
+                <span>I consent to photos of my dog being used for marketing <span class="opt">(uncheck to opt out)</span></span>
               </label>
             </div>
             <div class="full">

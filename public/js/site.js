@@ -26,6 +26,30 @@
     });
   }
 
+  // ----- hero ripple parallax -----
+  var ripple = document.getElementById('hero-ripple');
+  var reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (ripple && !reducedMotion) {
+    var ticking = false;
+    var updateParallax = function () {
+      var y = window.scrollY || window.pageYOffset || 0;
+      var shift = Math.min(y * 0.18, 120);
+      ripple.style.transform = 'translateY(' + shift + 'px) scale(' + (1 + Math.min(y * 0.0002, 0.08)) + ')';
+      ticking = false;
+    };
+    window.addEventListener(
+      'scroll',
+      function () {
+        if (!ticking) {
+          window.requestAnimationFrame(updateParallax);
+          ticking = true;
+        }
+      },
+      { passive: true }
+    );
+    updateParallax();
+  }
+
   // ----- lightbox for pop-up pictures -----
   var cards = document.querySelectorAll('.pop-card');
   if (cards.length === 0) return;

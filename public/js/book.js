@@ -1,5 +1,6 @@
 /* Booking form: pulls slots, sizes and prices from the server so the form
-   always matches what Kaylee actually offers, then submits the booking. */
+   always matches what Kaylee actually offers, looks up returning clients
+   by phone to autofill their dog's details, and submits the booking. */
 
 (function () {
   const form = document.getElementById('booking-form');
@@ -8,7 +9,11 @@
   const sizeSelect = document.getElementById('dogSize');
   const durationSelect = document.getElementById('duration');
   const dateInput = document.getElementById('date');
+  const phoneInput = document.getElementById('phone');
   const submitBtn = document.getElementById('submit-btn');
+  const returningHint = document.getElementById('returning-hint');
+  const paymentNote = document.getElementById('payment-methods-note');
+  const paymentList = document.getElementById('payment-methods-list');
 
   function dollars(cents) {
     return '$' + (cents / 100).toFixed(cents % 100 === 0 ? 0 : 2);
@@ -68,6 +73,11 @@
         opt.textContent = d.minutes + ' minutes — ' + dollars(d.priceCents);
         return opt;
       });
+
+      if (config.paymentMethods && config.paymentMethods.length > 0) {
+        paymentList.textContent = config.paymentMethods.map((m) => m.label).join(', ');
+        paymentNote.hidden = false;
+      }
     })
     .catch(() => {
       showMessage(
@@ -77,12 +87,35 @@
       submitBtn.disabled = true;
     });
 
+  // Returning-client lookup: once a phone number looks complete, check if
+  // we already know this owner and fill in their dog's details for them.
+  let lastLookedUp = '';
+  function lookupReturningClient() {
+    const phone = phoneInput.value.trim();
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length < 7 || phone === lastLookedUp) return;
+    lastLookedUp = phone;
+
+    fetch('/api/clients/lookup?phone=' + encodeURIComponent(phone))
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data.found) return;
+        if (!form.ownerName.value.trim()) form.ownerName.value = data.ownerName || '';
+        if (!form.dogName.value.trim()) form.dogName.value = data.dogName || '';
+        if (!form.address.value.trim()) form.address.value = data.address || '';
+        if (!form.dogSize.value && data.dogSize) form.dogSize.value = data.dogSize;
+        returningHint.hidden = false;
+      })
+      .catch(() => {});
+  }
+  phoneInput.addEventListener('blur', lookupReturningClient);
+
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     msg.hidden = true;
 
-    if (!form.waiverAgreed.checked) {
-      showMessage('Please check the box agreeing to the terms before booking.', false);
+    if (!form.vaccinatedAgreed.checked || !form.waiverAgreed.checked) {
+      showMessage('Please check both required boxes above (vaccination/temperament and the waiver) before booking.', false);
       return;
     }
 
@@ -99,8 +132,10 @@
       slot: form.slot.value,
       duration: Number(form.duration.value),
       notes: form.notes.value.trim(),
+      referralCode: form.referralCode.value.trim(),
+      vaccinatedAgreed: form.vaccinatedAgreed.checked,
       waiverAgreed: form.waiverAgreed.checked,
-      photoOptOut: form.photoOptOut.checked,
+      photoConsent: form.photoConsent.checked,
     };
 
     fetch('/api/bookings', {
@@ -114,6 +149,8 @@
           showMessage(body.message || "You're booked!", true);
           form.reset();
           dateInput.min = today;
+          returningHint.hidden = true;
+          lastLookedUp = '';
         } else {
           showMessage(body.error || 'Something went wrong — please try again.', false);
         }

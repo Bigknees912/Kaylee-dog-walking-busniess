@@ -55,9 +55,63 @@
 
           <div id="stats-row" class="stats-row"></div>
 
-          <p class="hint">Bookings with the same date, time and walk length are grouped into one walk (up to three dogs) and sorted by street for an efficient route. Neighbour discounts apply automatically.</p>
+          <div class="dash-tabs" role="tablist">
+            <button class="dash-tab active" data-tab="list" type="button" role="tab">List</button>
+            <button class="dash-tab" data-tab="calendar" type="button" role="tab">Calendar</button>
+            <button class="dash-tab" data-tab="clients" type="button" role="tab">Clients</button>
+            <button class="dash-tab" data-tab="payments" type="button" role="tab">Payments</button>
+            <button class="dash-tab" data-tab="messages" type="button" role="tab">Messages</button>
+          </div>
 
-          <div id="walks"></div>
+          <div id="panel-list" class="dash-panel">
+            <p class="hint">Bookings with the same date, time and walk length are grouped into one walk (up to three dogs) and sorted by street for an efficient route. Neighbour and referral discounts apply automatically.</p>
+            <div id="walks"></div>
+          </div>
+
+          <div id="panel-calendar" class="dash-panel" hidden>
+            <div class="cal-nav">
+              <button id="cal-prev" class="btn btn-quiet btn-small" type="button">← Previous week</button>
+              <div id="cal-range" class="cal-range"></div>
+              <button id="cal-next" class="btn btn-quiet btn-small" type="button">Next week →</button>
+            </div>
+            <div id="cal-grid" class="cal-grid"></div>
+          </div>
+
+          <div id="panel-clients" class="dash-panel" hidden>
+            <p class="hint">Every client who has booked a walk, with their contact info, tags, notes, and booking history.</p>
+            <div id="clients-list" class="clients-list"></div>
+          </div>
+
+          <div id="panel-payments" class="dash-panel" hidden>
+            <p class="hint">Toggle which payment methods you currently accept. Whatever's on here shows to clients at checkout and in their booking confirmation.</p>
+            <div id="payment-toggles" class="payment-toggles"></div>
+          </div>
+
+          <div id="panel-messages" class="dash-panel" hidden>
+            <div class="notice" style="margin-bottom:20px;">
+              <strong>Not wired up yet:</strong> no SMS or email provider is connected (e.g. Twilio for texts, SendGrid/Postmark for email). Everything below is logged and ready to send the moment one is connected — nothing is actually delivered right now.
+            </div>
+
+            <h3>Notification log</h3>
+            <p class="hint">Booking confirmations and day-of reminders, queued automatically when a walk is booked.</p>
+            <div id="notif-log" class="notif-log"></div>
+
+            <h3 style="margin-top:36px;">Email templates</h3>
+            <div id="email-templates" class="email-templates"></div>
+
+            <h3 style="margin-top:36px;">Send an email</h3>
+            <div class="card">
+              <label for="email-template-select">Template</label>
+              <select id="email-template-select"></select>
+              <label for="email-recipients" style="margin-top:14px;">Recipients</label>
+              <div id="email-recipients" class="email-recipients"></div>
+              <button id="email-send-btn" class="btn btn-primary btn-small" type="button" style="margin-top:14px;">Queue email</button>
+              <div id="email-send-msg" class="form-msg" hidden></div>
+            </div>
+
+            <h3 style="margin-top:36px;">Sent log</h3>
+            <div id="email-log" class="notif-log"></div>
+          </div>
         </div>
       </div>
     </section>

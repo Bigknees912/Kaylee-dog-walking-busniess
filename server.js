@@ -1,9 +1,11 @@
 /**
  * Kaylee's Dog Walking Service — website + booking system
  *
- * Runs the whole site: static pages out of /public and a small JSON API
- * for bookings. Bookings persist to data/bookings.json so nothing is
- * lost between restarts.
+ * Runs the whole site: static pages out of /public and a JSON API for
+ * bookings, returning clients, referral credits, payment preferences,
+ * a notification log, and a lightweight CRM with email templates.
+ * Everything persists to JSON files under DATA_DIR so nothing is lost
+ * between restarts.
  */
 
 const express = require('express');
@@ -18,6 +20,11 @@ const PASSCODE = process.env.KAYLEE_PASSCODE || 'goldenpaws';
 
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const DATA_FILE = path.join(DATA_DIR, 'bookings.json');
+const CLIENTS_FILE = path.join(DATA_DIR, 'clients.json');
+const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
+const NOTIFICATIONS_FILE = path.join(DATA_DIR, 'notifications.json');
+const EMAIL_TEMPLATES_FILE = path.join(DATA_DIR, 'email-templates.json');
+const EMAIL_LOG_FILE = path.join(DATA_DIR, 'email-log.json');
 
 // ---------------------------------------------------------------------------
 // Business rules (single source of truth — the booking form reads these
@@ -42,6 +49,10 @@ const PRICES = { 30: 2000, 60: 3500 };
 // from the same street book the same time slot.
 const NEIGHBOUR_DISCOUNT = 500;
 
+// Referral credit, in cents, given to BOTH the new client and the referrer
+// when a valid referral code is used ("$10 credit for both sides").
+const REFERRAL_CREDIT = 1000;
+
 // Kaylee walks at most three dogs at once.
 const MAX_DOGS_PER_WALK = 3;
 
@@ -49,33 +60,93 @@ const DOG_SIZES = ['Small (under 25 lb)', 'Medium (25–60 lb)', 'Large (over 60
 
 const STATUS = { BOOKED: 'booked', DONE: 'done', CANCELLED: 'cancelled' };
 
+const PAYMENT_METHOD_LABELS = {
+  etransfer: 'e-Transfer',
+  cash: 'Cash',
+  stripe: 'Card (Stripe)',
+};
+
+const REGULAR_AFTER_WALKS = 3;
+
 // ---------------------------------------------------------------------------
-// Storage
+// Storage — one small JSON file per collection, written atomically.
 // ---------------------------------------------------------------------------
 
 let bookings = [];
+let clients = [];
+let settings = { paymentMethods: { etransfer: true, cash: true, stripe: false } };
+let notifications = [];
+let emailTemplates = [];
+let emailLog = [];
 
-function loadBookings() {
-  try {
-    const raw = fs.readFileSync(DATA_FILE, 'utf8');
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) {
-      bookings = parsed;
-    }
-  } catch (err) {
-    if (err.code !== 'ENOENT') {
-      console.error('Could not read bookings file, starting empty:', err.message);
-    }
-    bookings = [];
-  }
+function makeStore(file, initial) {
+  return {
+    load() {
+      try {
+        const raw = fs.readFileSync(file, 'utf8');
+        return JSON.parse(raw);
+      } catch (err) {
+        if (err.code !== 'ENOENT') {
+          console.error(`Could not read ${path.basename(file)}, starting fresh:`, err.message);
+        }
+        return initial;
+      }
+    },
+    save(data) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+      const tmp = file + '.tmp';
+      fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
+      fs.renameSync(tmp, file);
+    },
+  };
 }
 
-function saveBookings() {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  const tmp = DATA_FILE + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(bookings, null, 2));
-  fs.renameSync(tmp, DATA_FILE);
-}
+const bookingsStore = makeStore(DATA_FILE, []);
+const clientsStore = makeStore(CLIENTS_FILE, []);
+const settingsStore = makeStore(SETTINGS_FILE, settings);
+const notificationsStore = makeStore(NOTIFICATIONS_FILE, []);
+const emailTemplatesStore = makeStore(EMAIL_TEMPLATES_FILE, []);
+const emailLogStore = makeStore(EMAIL_LOG_FILE, []);
+
+function saveBookings() { bookingsStore.save(bookings); }
+function saveClients() { clientsStore.save(clients); }
+function saveSettings() { settingsStore.save(settings); }
+function saveNotifications() { notificationsStore.save(notifications); }
+function saveEmailTemplates() { emailTemplatesStore.save(emailTemplates); }
+function saveEmailLog() { emailLogStore.save(emailLog); }
+
+const DEFAULT_EMAIL_TEMPLATES = [
+  {
+    id: 'welcome',
+    name: 'Welcome message',
+    subject: "Welcome to Kaylee's Dog Walking Service!",
+    body:
+      "Hi {{ownerName}},\n\nThanks so much for booking with Kaylee's Dog Walking Service! " +
+      "{{dogName}} is officially on the schedule and I can't wait to meet them.\n\n" +
+      "A few quick notes: I'll text a photo after every walk, and if you ever have a " +
+      "neighbour who wants to join a slot, you both get a discount.\n\n" +
+      "See you soon!\nKaylee",
+  },
+  {
+    id: 'walk-confirmation',
+    name: 'Walk confirmation',
+    subject: 'Your walk with {{dogName}} is confirmed',
+    body:
+      "Hi {{ownerName}},\n\nJust confirming {{dogName}}'s walk on {{date}} at {{slot}}. " +
+      "I'll pick up right at your door and text a photo when we're done.\n\n" +
+      "See you then!\nKaylee",
+  },
+  {
+    id: 'monthly-promo',
+    name: 'Monthly promotion',
+    subject: 'A little something for {{dogName}} this month',
+    body:
+      "Hi {{ownerName}},\n\nHope {{dogName}} has been loving the walks! Just a heads up — " +
+      "if you refer a neighbour this month, you both get a $10 credit once they book their " +
+      "first walk. Their referral code is your name + the last 4 digits of your phone " +
+      "number: {{referralCode}}.\n\nThanks for being part of the pack!\nKaylee",
+  },
+];
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -94,6 +165,10 @@ function normalizeStreet(address) {
 function displayStreet(address) {
   const street = String(address).replace(/^[\s#\-\d,.]+/, '').replace(/\s+/g, ' ').trim();
   return street || String(address).trim();
+}
+
+function normalizePhone(phone) {
+  return String(phone).replace(/\D/g, '');
 }
 
 function isValidDateString(value) {
@@ -133,12 +208,129 @@ function requirePasscode(req, res, next) {
   next();
 }
 
+/** First name, letters only, uppercased — for referral codes. */
+function firstNameSlug(name) {
+  const first = String(name).trim().split(/\s+/)[0] || 'FRIEND';
+  return first.replace(/[^a-zA-Z]/g, '').toUpperCase() || 'FRIEND';
+}
+
+function generateReferralCode(ownerName, phone) {
+  const base = firstNameSlug(ownerName) + normalizePhone(phone).slice(-4);
+  let code = base;
+  let n = 1;
+  const existing = new Set(clients.map((c) => c.referralCode));
+  while (existing.has(code)) {
+    n += 1;
+    code = base + n;
+  }
+  return code;
+}
+
+function findClientByPhone(phone) {
+  const key = normalizePhone(phone);
+  return clients.find((c) => c.normalizedPhone === key);
+}
+
+/**
+ * Create or refresh a client profile from a booking, applying referral
+ * credit on both sides when a valid, non-self referral code is supplied.
+ * Returns { client, referralDiscountCents }.
+ */
+function upsertClientForBooking({ ownerName, dogName, dogSize, phone, address, referralCode }) {
+  const key = normalizePhone(phone);
+  let client = clients.find((c) => c.normalizedPhone === key);
+  let referralDiscountCents = 0;
+
+  if (!client) {
+    client = {
+      id: crypto.randomUUID(),
+      normalizedPhone: key,
+      phone,
+      ownerName,
+      dogName,
+      dogSize,
+      address,
+      notes: '',
+      tags: ['new'],
+      referralCode: generateReferralCode(ownerName, phone),
+      referredByClientId: null,
+      pendingCreditCents: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    clients.push(client);
+  } else {
+    client.ownerName = ownerName;
+    client.dogName = dogName;
+    client.dogSize = dogSize;
+    client.address = address;
+    client.phone = phone;
+    client.updatedAt = new Date().toISOString();
+  }
+
+  const suppliedCode = String(referralCode || '').trim().toUpperCase();
+  if (suppliedCode && !client.referredByClientId) {
+    const referrer = clients.find(
+      (c) => c.referralCode === suppliedCode && c.id !== client.id
+    );
+    if (referrer) {
+      referralDiscountCents = REFERRAL_CREDIT;
+      client.referredByClientId = referrer.id;
+      if (!client.tags.includes('referred')) client.tags.push('referred');
+      referrer.pendingCreditCents = (referrer.pendingCreditCents || 0) + REFERRAL_CREDIT;
+      referrer.updatedAt = new Date().toISOString();
+    }
+  }
+
+  saveClients();
+  return { client, referralDiscountCents };
+}
+
+/** Auto-tag "regular" once a client has enough completed walks. Manual tags are left alone. */
+function refreshRegularTag(client) {
+  const doneCount = bookings.filter(
+    (b) => b.normalizedPhone === client.normalizedPhone && b.status === STATUS.DONE
+  ).length;
+  if (doneCount >= REGULAR_AFTER_WALKS && !client.tags.includes('regular')) {
+    client.tags.push('regular');
+    client.updatedAt = new Date().toISOString();
+    saveClients();
+  }
+}
+
+function fillTemplate(text, vars) {
+  return String(text).replace(/\{\{(\w+)\}\}/g, (m, key) =>
+    Object.prototype.hasOwnProperty.call(vars, key) ? String(vars[key]) : m
+  );
+}
+
+function queueNotification({ bookingId, type, to, message, scheduledFor }) {
+  const note = {
+    id: crypto.randomUUID(),
+    bookingId,
+    type, // 'confirmation' | 'reminder'
+    to,
+    message,
+    scheduledFor,
+    status: 'queued', // never becomes "sent" until a real provider is wired in
+    createdAt: new Date().toISOString(),
+  };
+  notifications.push(note);
+  saveNotifications();
+  return note;
+}
+
+/** 8am the morning of the walk, in server-local time, as an ISO string. */
+function reminderTimeFor(dateString) {
+  const [y, m, d] = dateString.split('-').map(Number);
+  return new Date(y, m - 1, d, 8, 0, 0).toISOString();
+}
+
 /**
  * Build the schedule: group active bookings that share a date, time slot and
  * walk length into a single walk (max three dogs, enforced at booking time),
  * sort the dogs within each walk by street for an efficient route, and price
- * each dog with the neighbour discount applied when two or more dogs in the
- * walk come from the same street.
+ * each dog with the neighbour discount and any referral credit applied.
  */
 function buildSchedule() {
   const groups = new Map();
@@ -161,7 +353,10 @@ function buildSchedule() {
       .map((b) => {
         const base = PRICES[b.duration];
         const neighbourGroup = (streetCounts.get(normalizeStreet(b.address)) || 0) >= 2;
-        const priceCents = neighbourGroup ? base - NEIGHBOUR_DISCOUNT : base;
+        const priceCents = Math.max(
+          0,
+          base - (neighbourGroup ? NEIGHBOUR_DISCOUNT : 0) - (b.referralDiscountCents || 0)
+        );
         return {
           id: b.id,
           ownerName: b.ownerName,
@@ -174,7 +369,8 @@ function buildSchedule() {
           status: b.status,
           priceCents,
           neighbourDiscount: neighbourGroup,
-          photoOptOut: !!b.photoOptOut,
+          referralDiscount: !!b.referralDiscountCents,
+          photoConsent: b.photoConsent !== false,
         };
       })
       .sort(
@@ -234,6 +430,10 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/config', (req, res) => {
+  const activeMethods = Object.entries(settings.paymentMethods)
+    .filter(([, on]) => on)
+    .map(([key]) => ({ key, label: PAYMENT_METHOD_LABELS[key] || key }));
+
   res.json({
     slots: TIME_SLOTS,
     durations: Object.keys(PRICES).map((minutes) => ({
@@ -241,8 +441,32 @@ app.get('/api/config', (req, res) => {
       priceCents: PRICES[minutes],
     })),
     neighbourDiscountCents: NEIGHBOUR_DISCOUNT,
+    referralCreditCents: REFERRAL_CREDIT,
     maxDogsPerWalk: MAX_DOGS_PER_WALK,
     dogSizes: DOG_SIZES,
+    paymentMethods: activeMethods,
+  });
+});
+
+// Returning-client lookup so the booking form can autofill dog details.
+// Only returns booking-relevant fields — never notes, tags or credit balance.
+app.get('/api/clients/lookup', (req, res) => {
+  const phone = String(req.query.phone || '');
+  if (normalizePhone(phone).length < 7) {
+    res.json({ found: false });
+    return;
+  }
+  const client = findClientByPhone(phone);
+  if (!client) {
+    res.json({ found: false });
+    return;
+  }
+  res.json({
+    found: true,
+    ownerName: client.ownerName,
+    dogName: client.dogName,
+    dogSize: client.dogSize,
+    address: client.address,
   });
 });
 
@@ -258,8 +482,10 @@ app.post('/api/bookings', (req, res) => {
   const slot = String(body.slot || '').trim();
   const duration = Number(body.duration);
   const notes = String(body.notes || '').trim().slice(0, 500);
+  const referralCode = String(body.referralCode || '').trim();
+  const vaccinatedAgreed = body.vaccinatedAgreed === true;
   const waiverAgreed = body.waiverAgreed === true;
-  const photoOptOut = body.photoOptOut === true;
+  const photoConsent = body.photoConsent !== false; // opt-out checkbox; default true
 
   const problems = [];
   if (!ownerName) problems.push('your name');
@@ -285,9 +511,9 @@ app.post('/api/bookings', (req, res) => {
     return;
   }
 
-  if (!waiverAgreed) {
+  if (!vaccinatedAgreed || !waiverAgreed) {
     res.status(400).json({
-      error: 'Please check the box agreeing to the terms before booking.',
+      error: 'Please check both required boxes (vaccination/temperament and the waiver) before booking.',
     });
     return;
   }
@@ -311,22 +537,51 @@ app.post('/api/bookings', (req, res) => {
     return;
   }
 
+  let referralDiscountCents = 0;
+  let referralApplied = false;
+  if (referralCode) {
+    const match = clients.find(
+      (c) => c.referralCode === referralCode.toUpperCase() && c.normalizedPhone !== normalizePhone(phone)
+    );
+    if (!match) {
+      res.status(400).json({ error: `"${referralCode}" isn't a code I recognize — double-check it, or leave it blank.` });
+      return;
+    }
+  }
+
   const booking = {
     id: crypto.randomUUID(),
     ownerName,
     dogName,
     dogSize,
     phone,
+    normalizedPhone: normalizePhone(phone),
     address,
     date,
     slot,
     duration,
     notes,
+    vaccinatedAgreed,
     waiverAgreed,
-    photoOptOut,
+    waiverAgreedAt: new Date().toISOString(),
+    photoConsent,
+    referralCodeUsed: referralCode || null,
+    referralDiscountCents: 0,
     status: STATUS.BOOKED,
     createdAt: new Date().toISOString(),
   };
+
+  const { client, referralDiscountCents: creditCents } = upsertClientForBooking({
+    ownerName,
+    dogName,
+    dogSize,
+    phone,
+    address,
+    referralCode,
+  });
+  booking.referralDiscountCents = creditCents;
+  referralDiscountCents = creditCents;
+  referralApplied = creditCents > 0;
 
   bookings.push(booking);
   saveBookings();
@@ -335,13 +590,50 @@ app.post('/api/bookings', (req, res) => {
     (b) => normalizeStreet(b.address) === normalizeStreet(address)
   );
 
+  const activePaymentMethods = Object.entries(settings.paymentMethods)
+    .filter(([, on]) => on)
+    .map(([key]) => PAYMENT_METHOD_LABELS[key] || key);
+
+  const confirmationLines = [
+    `Hi ${ownerName}, ${dogName}'s walk is booked for ${date} at ${slot} (${duration} min).`,
+  ];
+  if (joinedNeighbours) confirmationLines.push('A neighbour on your street joined the same slot, so you both get $5 off!');
+  if (referralApplied) confirmationLines.push(`Your referral code was applied — $${(referralDiscountCents / 100).toFixed(0)} off this walk.`);
+  if (activePaymentMethods.length) confirmationLines.push(`Payment accepted: ${activePaymentMethods.join(', ')}.`);
+  confirmationLines.push("I'll text a photo after the walk!");
+
+  queueNotification({
+    bookingId: booking.id,
+    type: 'confirmation',
+    to: phone,
+    message: confirmationLines.join(' '),
+    scheduledFor: booking.createdAt,
+  });
+  queueNotification({
+    bookingId: booking.id,
+    type: 'reminder',
+    to: phone,
+    message: `Hi ${ownerName}, just a reminder — ${dogName}'s walk with Kaylee is today at ${slot}!`,
+    scheduledFor: reminderTimeFor(date),
+  });
+
+  const messageParts = [];
+  messageParts.push(
+    joinedNeighbours
+      ? `You're booked — and a neighbour on your street has the same slot, so you both get the group discount!`
+      : `You're booked! I'll text ${phone} to confirm.`
+  );
+  if (referralApplied) messageParts.push(`Your referral code saved you $${(referralDiscountCents / 100).toFixed(0)}.`);
+  if (activePaymentMethods.length) messageParts.push(`Accepted payment: ${activePaymentMethods.join(', ')}.`);
+
   res.status(201).json({
     ok: true,
     id: booking.id,
     neighbourDiscount: joinedNeighbours,
-    message: joinedNeighbours
-      ? `You're booked — and a neighbour on your street has the same slot, so you both get the group discount!`
-      : `You're booked! I'll text ${phone} to confirm.`,
+    referralApplied,
+    referralDiscountCents,
+    paymentMethods: activePaymentMethods,
+    message: messageParts.join(' '),
   });
 });
 
@@ -368,7 +660,177 @@ app.patch('/api/bookings/:id', requirePasscode, (req, res) => {
 
   booking.status = action === 'done' ? STATUS.DONE : STATUS.CANCELLED;
   saveBookings();
+
+  if (action === 'done') {
+    const client = findClientByPhone(booking.phone);
+    if (client) refreshRegularTag(client);
+  }
+
   res.json({ ok: true, status: booking.status });
+});
+
+// ---------------------------------------------------------------------------
+// CRM: client profiles (passcode-protected — this is Kaylee's private data)
+// ---------------------------------------------------------------------------
+
+app.get('/api/clients', requirePasscode, (req, res) => {
+  const list = clients.map((c) => {
+    const history = bookings
+      .filter((b) => b.normalizedPhone === c.normalizedPhone)
+      .sort((a, b) => (a.date + a.slot).localeCompare(b.date + b.slot));
+    return {
+      ...c,
+      bookingCount: history.length,
+      completedCount: history.filter((b) => b.status === STATUS.DONE).length,
+      upcoming: history.filter((b) => b.status === STATUS.BOOKED),
+      past: history.filter((b) => b.status !== STATUS.BOOKED),
+    };
+  });
+  res.json({ clients: list });
+});
+
+app.get('/api/clients/:id', requirePasscode, (req, res) => {
+  const client = clients.find((c) => c.id === req.params.id);
+  if (!client) {
+    res.status(404).json({ error: 'Client not found.' });
+    return;
+  }
+  const history = bookings
+    .filter((b) => b.normalizedPhone === client.normalizedPhone)
+    .sort((a, b) => (a.date + a.slot).localeCompare(b.date + b.slot));
+  res.json({
+    ...client,
+    bookings: history,
+  });
+});
+
+app.patch('/api/clients/:id', requirePasscode, (req, res) => {
+  const client = clients.find((c) => c.id === req.params.id);
+  if (!client) {
+    res.status(404).json({ error: 'Client not found.' });
+    return;
+  }
+  const body = req.body || {};
+  if (typeof body.notes === 'string') client.notes = body.notes.slice(0, 2000);
+  if (Array.isArray(body.tags)) {
+    client.tags = body.tags.map((t) => String(t).trim()).filter(Boolean).slice(0, 10);
+  }
+  client.updatedAt = new Date().toISOString();
+  saveClients();
+  res.json({ ok: true, client });
+});
+
+// ---------------------------------------------------------------------------
+// Payment preferences
+// ---------------------------------------------------------------------------
+
+app.get('/api/settings/payment-methods', requirePasscode, (req, res) => {
+  res.json({ paymentMethods: settings.paymentMethods, labels: PAYMENT_METHOD_LABELS });
+});
+
+app.patch('/api/settings/payment-methods', requirePasscode, (req, res) => {
+  const body = req.body || {};
+  for (const key of Object.keys(PAYMENT_METHOD_LABELS)) {
+    if (typeof body[key] === 'boolean') settings.paymentMethods[key] = body[key];
+  }
+  saveSettings();
+  res.json({ ok: true, paymentMethods: settings.paymentMethods });
+});
+
+// ---------------------------------------------------------------------------
+// Notification log (booking confirmations + day-of reminders).
+// NOTE: nothing here actually sends an SMS or email yet — see the
+// "notConnected" flag returned below. Wiring in a real provider (e.g.
+// Twilio for SMS, or SendGrid/Postmark/Resend for email) means calling
+// their API at the point queueNotification()/POST /api/emails/send is
+// called, then flipping the log entry's status to "sent".
+// ---------------------------------------------------------------------------
+
+app.get('/api/notifications', requirePasscode, (req, res) => {
+  res.json({
+    notConnected: true,
+    notice: 'No SMS provider is wired in yet (e.g. Twilio) — these messages are logged but not actually delivered.',
+    notifications: notifications.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Email templates + one-off/bulk send log.
+// NOTE: same caveat as above — no email provider is connected. "Sending"
+// here writes a log entry so the interface and data model are ready; wire
+// a real provider into POST /api/emails/send to actually deliver mail.
+// ---------------------------------------------------------------------------
+
+app.get('/api/email-templates', requirePasscode, (req, res) => {
+  res.json({ templates: emailTemplates });
+});
+
+app.patch('/api/email-templates/:id', requirePasscode, (req, res) => {
+  const tpl = emailTemplates.find((t) => t.id === req.params.id);
+  if (!tpl) {
+    res.status(404).json({ error: 'Template not found.' });
+    return;
+  }
+  const body = req.body || {};
+  if (typeof body.subject === 'string') tpl.subject = body.subject.slice(0, 200);
+  if (typeof body.body === 'string') tpl.body = body.body.slice(0, 5000);
+  if (typeof body.name === 'string') tpl.name = body.name.slice(0, 80);
+  saveEmailTemplates();
+  res.json({ ok: true, template: tpl });
+});
+
+app.get('/api/email-log', requirePasscode, (req, res) => {
+  res.json({
+    notConnected: true,
+    notice: 'No email provider is wired in yet (e.g. SendGrid, Postmark, Resend) — sends below are logged, not delivered.',
+    log: emailLog.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+  });
+});
+
+app.post('/api/emails/send', requirePasscode, (req, res) => {
+  const body = req.body || {};
+  const templateId = String(body.templateId || '');
+  const clientIds = Array.isArray(body.clientIds) ? body.clientIds : [];
+  const subjectOverride = typeof body.subject === 'string' ? body.subject : null;
+  const bodyOverride = typeof body.body === 'string' ? body.body : null;
+
+  const template = emailTemplates.find((t) => t.id === templateId);
+  if (!template && !(subjectOverride && bodyOverride)) {
+    res.status(400).json({ error: 'Pick a template or supply a custom subject and body.' });
+    return;
+  }
+  const recipients = clients.filter((c) => clientIds.includes(c.id));
+  if (recipients.length === 0) {
+    res.status(400).json({ error: 'Select at least one client to send to.' });
+    return;
+  }
+
+  const entries = recipients.map((client) => {
+    const vars = {
+      ownerName: client.ownerName,
+      dogName: client.dogName,
+      referralCode: client.referralCode,
+      date: '',
+      slot: '',
+    };
+    const subject = fillTemplate(subjectOverride ?? template.subject, vars);
+    const text = fillTemplate(bodyOverride ?? template.body, vars);
+    const entry = {
+      id: crypto.randomUUID(),
+      templateId: template ? template.id : 'custom',
+      clientId: client.id,
+      to: client.ownerName,
+      subject,
+      body: text,
+      status: 'queued — not sent (no email provider connected)',
+      createdAt: new Date().toISOString(),
+    };
+    emailLog.push(entry);
+    return entry;
+  });
+
+  saveEmailLog();
+  res.status(201).json({ ok: true, notConnected: true, queued: entries.length, entries });
 });
 
 // Friendly 404 for unknown API routes (static pages fall through to express.static).
@@ -376,7 +838,16 @@ app.use('/api', (req, res) => {
   res.status(404).json({ error: 'Not found.' });
 });
 
-loadBookings();
+bookings = bookingsStore.load();
+clients = clientsStore.load();
+settings = Object.assign({ paymentMethods: { etransfer: true, cash: true, stripe: false } }, settingsStore.load());
+notifications = notificationsStore.load();
+emailTemplates = emailTemplatesStore.load();
+if (!Array.isArray(emailTemplates) || emailTemplates.length === 0) {
+  emailTemplates = DEFAULT_EMAIL_TEMPLATES.map((t) => ({ ...t }));
+  saveEmailTemplates();
+}
+emailLog = emailLogStore.load();
 
 app.listen(PORT, () => {
   console.log(`Kaylee's Dog Walking Service is up at http://localhost:${PORT}`);
