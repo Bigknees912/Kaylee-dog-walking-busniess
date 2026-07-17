@@ -104,6 +104,8 @@
         if (!form.dogName.value.trim()) form.dogName.value = data.dogName || '';
         if (!form.address.value.trim()) form.address.value = data.address || '';
         if (!form.dogSize.value && data.dogSize) form.dogSize.value = data.dogSize;
+        if (!form.email.value.trim()) form.email.value = data.email || '';
+        if (!form.dogBirthday.value.trim()) form.dogBirthday.value = data.dogBirthday || '';
         returningHint.hidden = false;
       })
       .catch(() => {});
@@ -127,11 +129,13 @@
       dogName: form.dogName.value.trim(),
       dogSize: form.dogSize.value,
       phone: form.phone.value.trim(),
+      email: form.email.value.trim(),
       address: form.address.value.trim(),
       date: form.date.value,
       slot: form.slot.value,
       duration: Number(form.duration.value),
       notes: form.notes.value.trim(),
+      dogBirthday: form.dogBirthday.value.trim(),
       referralCode: form.referralCode.value.trim(),
       vaccinatedAgreed: form.vaccinatedAgreed.checked,
       waiverAgreed: form.waiverAgreed.checked,

@@ -56,7 +56,9 @@
   function renderStats(stats) {
     statsRow.innerHTML = '';
     const tiles = [
-      [dollars(stats.earnedCents), 'earned so far'],
+      [String(stats.walksThisWeek), 'walks this week'],
+      [String(stats.walksThisMonth), 'walks this month'],
+      [dollars(stats.earnedCents), 'earned in total'],
       [dollars(stats.upcomingCents), 'booked & upcoming'],
       [String(stats.completedWalks), 'walks completed'],
       [String(stats.dogsWalked), 'happy dogs walked'],
@@ -221,8 +223,12 @@
 
   dashTabs.forEach((tab) => {
     tab.addEventListener('click', () => {
-      dashTabs.forEach((t) => t.classList.remove('active'));
+      dashTabs.forEach((t) => {
+        t.classList.remove('active');
+        t.setAttribute('aria-selected', 'false');
+      });
       tab.classList.add('active');
+      tab.setAttribute('aria-selected', 'true');
       const target = tab.dataset.tab;
       Object.keys(dashPanels).forEach((key) => {
         dashPanels[key].hidden = key !== target;
@@ -317,10 +323,20 @@
   // ----- clients (CRM) -----
 
   function loadClients() {
-    api('/api/clients').then(({ ok, body }) => {
-      if (!ok) return;
-      renderClients(body.clients);
-    });
+    const holder = document.getElementById('clients-list');
+    api('/api/clients')
+      .then(({ ok, body }) => {
+        if (!ok) {
+          holder.innerHTML = '';
+          holder.appendChild(el('p', 'hint', body.error || 'Could not load clients.'));
+          return;
+        }
+        renderClients(body.clients);
+      })
+      .catch(() => {
+        holder.innerHTML = '';
+        holder.appendChild(el('p', 'hint', 'Could not reach the server — try refreshing.'));
+      });
   }
 
   function updateClientTags(id, tags) {
@@ -328,13 +344,24 @@
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tags: tags }),
-    }).then(() => loadClients());
+    })
+      .then(({ ok }) => {
+        if (!ok) {
+          window.alert('Could not update tags — please try again.');
+          return;
+        }
+        loadClients();
+      })
+      .catch(() => window.alert('Could not reach the server — try refreshing.'));
   }
 
   function renderClientCard(c) {
     const card = el('div', 'card client-card');
     card.appendChild(el('div', 'client-name', c.ownerName + ' · ' + c.dogName));
-    card.appendChild(el('div', 'client-sub', c.phone + ' · ' + c.address));
+    card.appendChild(el('div', 'client-sub', c.phone + (c.email ? ' · ' + c.email : '') + ' · ' + c.address));
+    if (c.dogBirthday) {
+      card.appendChild(el('div', 'client-sub', '🎂 ' + c.dogBirthday));
+    }
     card.appendChild(
       el(
         'div',
@@ -382,14 +409,23 @@
     const saveBtn = el('button', 'btn btn-primary btn-small', 'Save notes');
     saveBtn.type = 'button';
     saveBtn.addEventListener('click', () => {
+      saveBtn.disabled = true;
       api('/api/clients/' + c.id, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ notes: notesArea.value }),
-      }).then(() => {
-        saveBtn.textContent = 'Saved ✓';
-        setTimeout(() => (saveBtn.textContent = 'Save notes'), 1200);
-      });
+      })
+        .then(({ ok }) => {
+          saveBtn.textContent = ok ? 'Saved ✓' : 'Failed — retry';
+          setTimeout(() => (saveBtn.textContent = 'Save notes'), 1500);
+        })
+        .catch(() => {
+          saveBtn.textContent = 'Failed — retry';
+          setTimeout(() => (saveBtn.textContent = 'Save notes'), 1500);
+        })
+        .finally(() => {
+          saveBtn.disabled = false;
+        });
     });
     card.appendChild(saveBtn);
 
@@ -419,10 +455,20 @@
   };
 
   function loadPaymentSettings() {
-    api('/api/settings/payment-methods').then(({ ok, body }) => {
-      if (!ok) return;
-      renderPaymentToggles(body.paymentMethods, body.labels);
-    });
+    const holder = document.getElementById('payment-toggles');
+    api('/api/settings/payment-methods')
+      .then(({ ok, body }) => {
+        if (!ok) {
+          holder.innerHTML = '';
+          holder.appendChild(el('p', 'hint', body.error || 'Could not load payment settings.'));
+          return;
+        }
+        renderPaymentToggles(body.paymentMethods, body.labels);
+      })
+      .catch(() => {
+        holder.innerHTML = '';
+        holder.appendChild(el('p', 'hint', 'Could not reach the server — try refreshing.'));
+      });
   }
 
   function renderPaymentToggles(methods, labels) {
@@ -440,13 +486,28 @@
       input.type = 'checkbox';
       input.checked = !!methods[key];
       input.addEventListener('change', () => {
+        const desired = input.checked;
+        input.disabled = true;
         const patch = {};
-        patch[key] = input.checked;
+        patch[key] = desired;
         api('/api/settings/payment-methods', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(patch),
-        });
+        })
+          .then(({ ok }) => {
+            if (!ok) {
+              input.checked = !desired; // revert on failure so the UI matches reality
+              window.alert('Could not save that — please try again.');
+            }
+          })
+          .catch(() => {
+            input.checked = !desired;
+            window.alert('Could not reach the server — try again.');
+          })
+          .finally(() => {
+            input.disabled = false;
+          });
       });
       switchLabel.appendChild(input);
       switchLabel.appendChild(el('span', 'slider'));
@@ -475,29 +536,49 @@
   }
 
   function loadNotifications() {
-    api('/api/notifications').then(({ ok, body }) => {
-      if (!ok) return;
-      renderLogEntries(
-        document.getElementById('notif-log'),
-        body.notifications,
-        (n) => n.type + ' → ' + n.to,
-        (n) => n.message,
-        'Nothing queued yet.'
-      );
-    });
+    const holder = document.getElementById('notif-log');
+    api('/api/notifications')
+      .then(({ ok, body }) => {
+        if (!ok) {
+          holder.innerHTML = '';
+          holder.appendChild(el('p', 'hint', body.error || 'Could not load the notification log.'));
+          return;
+        }
+        renderLogEntries(
+          holder,
+          body.notifications,
+          (n) => n.type + ' → ' + n.to,
+          (n) => n.message,
+          'Nothing queued yet.'
+        );
+      })
+      .catch(() => {
+        holder.innerHTML = '';
+        holder.appendChild(el('p', 'hint', 'Could not reach the server — try refreshing.'));
+      });
   }
 
   function loadEmailLog() {
-    api('/api/email-log').then(({ ok, body }) => {
-      if (!ok) return;
-      renderLogEntries(
-        document.getElementById('email-log'),
-        body.log,
-        (e) => 'To: ' + e.to,
-        (e) => e.subject,
-        'No emails queued yet.'
-      );
-    });
+    const holder = document.getElementById('email-log');
+    api('/api/email-log')
+      .then(({ ok, body }) => {
+        if (!ok) {
+          holder.innerHTML = '';
+          holder.appendChild(el('p', 'hint', body.error || 'Could not load the sent log.'));
+          return;
+        }
+        renderLogEntries(
+          holder,
+          body.log,
+          (e) => 'To: ' + e.to,
+          (e) => e.subject,
+          'No emails queued yet.'
+        );
+      })
+      .catch(() => {
+        holder.innerHTML = '';
+        holder.appendChild(el('p', 'hint', 'Could not reach the server — try refreshing.'));
+      });
   }
 
   function renderEmailTemplates(templates) {
@@ -515,14 +596,23 @@
       const saveBtn = el('button', 'btn btn-quiet btn-small', 'Save template');
       saveBtn.type = 'button';
       saveBtn.addEventListener('click', () => {
+        saveBtn.disabled = true;
         api('/api/email-templates/' + t.id, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ subject: subjInput.value, body: bodyArea.value }),
-        }).then(() => {
-          saveBtn.textContent = 'Saved ✓';
-          setTimeout(() => (saveBtn.textContent = 'Save template'), 1200);
-        });
+        })
+          .then(({ ok }) => {
+            saveBtn.textContent = ok ? 'Saved ✓' : 'Failed — retry';
+            setTimeout(() => (saveBtn.textContent = 'Save template'), 1500);
+          })
+          .catch(() => {
+            saveBtn.textContent = 'Failed — retry';
+            setTimeout(() => (saveBtn.textContent = 'Save template'), 1500);
+          })
+          .finally(() => {
+            saveBtn.disabled = false;
+          });
       });
       card.appendChild(saveBtn);
       holder.appendChild(card);
@@ -530,41 +620,57 @@
   }
 
   function loadEmailTemplates() {
-    api('/api/email-templates').then(({ ok, body }) => {
-      if (!ok) return;
-      renderEmailTemplates(body.templates);
-      const select = document.getElementById('email-template-select');
-      select.innerHTML = '';
-      body.templates.forEach((t) => {
-        const opt = document.createElement('option');
-        opt.value = t.id;
-        opt.textContent = t.name;
-        select.appendChild(opt);
+    const select = document.getElementById('email-template-select');
+    api('/api/email-templates')
+      .then(({ ok, body }) => {
+        if (!ok) return;
+        renderEmailTemplates(body.templates);
+        select.innerHTML = '';
+        body.templates.forEach((t) => {
+          const opt = document.createElement('option');
+          opt.value = t.id;
+          opt.textContent = t.name;
+          select.appendChild(opt);
+        });
+      })
+      .catch(() => {
+        document.getElementById('email-templates').innerHTML = '';
+        document
+          .getElementById('email-templates')
+          .appendChild(el('p', 'hint', 'Could not load templates — try refreshing.'));
       });
-    });
   }
 
   function loadClientsForRecipients() {
-    api('/api/clients').then(({ ok, body }) => {
-      if (!ok) return;
-      const holder = document.getElementById('email-recipients');
-      holder.innerHTML = '';
-      if (body.clients.length === 0) {
-        holder.appendChild(el('p', 'hint', 'No clients yet.'));
-        return;
-      }
-      body.clients.forEach((c) => {
-        const label = document.createElement('label');
-        label.className = 'recipient-chip';
-        const cb = document.createElement('input');
-        cb.type = 'checkbox';
-        cb.value = c.id;
-        cb.style.margin = '0';
-        label.appendChild(cb);
-        label.appendChild(document.createTextNode(c.ownerName + ' (' + c.dogName + ')'));
-        holder.appendChild(label);
+    const holder = document.getElementById('email-recipients');
+    api('/api/clients')
+      .then(({ ok, body }) => {
+        if (!ok) {
+          holder.innerHTML = '';
+          holder.appendChild(el('p', 'hint', body.error || 'Could not load clients.'));
+          return;
+        }
+        holder.innerHTML = '';
+        if (body.clients.length === 0) {
+          holder.appendChild(el('p', 'hint', 'No clients yet.'));
+          return;
+        }
+        body.clients.forEach((c) => {
+          const label = document.createElement('label');
+          label.className = 'recipient-chip';
+          const cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.value = c.id;
+          cb.style.margin = '0';
+          label.appendChild(cb);
+          label.appendChild(document.createTextNode(c.ownerName + ' (' + c.dogName + ')'));
+          holder.appendChild(label);
+        });
+      })
+      .catch(() => {
+        holder.innerHTML = '';
+        holder.appendChild(el('p', 'hint', 'Could not reach the server — try refreshing.'));
       });
-    });
   }
 
   function loadMessages() {
@@ -586,18 +692,28 @@
         msgEl.hidden = false;
         return;
       }
+      emailSendBtn.disabled = true;
       api('/api/emails/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ templateId: templateId, clientIds: checked }),
-      }).then(({ ok, body }) => {
-        msgEl.textContent = ok
-          ? 'Queued ' + body.queued + ' email(s) — not actually sent yet (no email provider connected).'
-          : body.error || 'Something went wrong.';
-        msgEl.className = 'form-msg ' + (ok ? 'ok' : 'err');
-        msgEl.hidden = false;
-        if (ok) loadEmailLog();
-      });
+      })
+        .then(({ ok, body }) => {
+          msgEl.textContent = ok
+            ? 'Queued ' + body.queued + ' email(s) — not actually sent yet (no email provider connected).'
+            : body.error || 'Something went wrong.';
+          msgEl.className = 'form-msg ' + (ok ? 'ok' : 'err');
+          msgEl.hidden = false;
+          if (ok) loadEmailLog();
+        })
+        .catch(() => {
+          msgEl.textContent = 'Could not reach the server — please try again.';
+          msgEl.className = 'form-msg err';
+          msgEl.hidden = false;
+        })
+        .finally(() => {
+          emailSendBtn.disabled = false;
+        });
     });
   }
 
@@ -608,6 +724,35 @@
   });
 
   refreshBtn.addEventListener('click', loadSchedule);
+
+  const backupBtn = document.getElementById('backup-btn');
+  if (backupBtn) {
+    backupBtn.addEventListener('click', () => {
+      backupBtn.disabled = true;
+      backupBtn.textContent = 'Preparing…';
+      fetch('/api/export', { headers: { 'x-passcode': passcode } })
+        .then((res) => {
+          if (!res.ok) throw new Error('export failed');
+          return res.blob();
+        })
+        .then((blob) => {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          const stamp = new Date().toISOString().slice(0, 10);
+          a.href = url;
+          a.download = 'kaylees-dog-walking-backup-' + stamp + '.json';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+        })
+        .catch(() => window.alert('Could not download the backup — please try again.'))
+        .finally(() => {
+          backupBtn.disabled = false;
+          backupBtn.textContent = 'Download backup';
+        });
+    });
+  }
 
   lockBtn.addEventListener('click', () => {
     sessionStorage.removeItem('kaylee-passcode');

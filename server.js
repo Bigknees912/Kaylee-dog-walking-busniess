@@ -191,6 +191,15 @@ function slotIndex(slot) {
   return TIME_SLOTS.indexOf(slot);
 }
 
+/** "6:00 PM" -> 1080 (minutes since midnight), for overlap math. */
+function slotToMinutes(slot) {
+  const m = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(String(slot).trim());
+  if (!m) return null;
+  let hours = Number(m[1]) % 12;
+  if (/pm/i.test(m[3])) hours += 12;
+  return hours * 60 + Number(m[2]);
+}
+
 function walkKey(b) {
   return `${b.date}|${b.slot}|${b.duration}`;
 }
@@ -199,9 +208,33 @@ function isActive(b) {
   return b.status === STATUS.BOOKED || b.status === STATUS.DONE;
 }
 
+// ---------------------------------------------------------------------------
+// Minimal in-memory rate limiting — protects the passcode gate from brute
+// force and the public client-lookup endpoint from phone-number enumeration.
+// Resets on server restart; that's fine for a single-operator local site.
+// ---------------------------------------------------------------------------
+
+const rateBuckets = new Map();
+
+function clientIp(req) {
+  return req.ip || (req.connection && req.connection.remoteAddress) || 'unknown';
+}
+
+function underRateLimit(key, max, windowMs) {
+  const now = Date.now();
+  const hits = (rateBuckets.get(key) || []).filter((t) => now - t < windowMs);
+  hits.push(now);
+  rateBuckets.set(key, hits);
+  return hits.length <= max;
+}
+
 function requirePasscode(req, res, next) {
   const supplied = req.get('x-passcode') || req.query.passcode || '';
   if (supplied !== PASSCODE) {
+    if (!underRateLimit('passcode-fail:' + clientIp(req), 20, 15 * 60 * 1000)) {
+      res.status(429).json({ error: 'Too many attempts — please wait a few minutes and try again.' });
+      return;
+    }
     res.status(401).json({ error: 'Wrong passcode.' });
     return;
   }
@@ -236,7 +269,7 @@ function findClientByPhone(phone) {
  * credit on both sides when a valid, non-self referral code is supplied.
  * Returns { client, referralDiscountCents }.
  */
-function upsertClientForBooking({ ownerName, dogName, dogSize, phone, address, referralCode }) {
+function upsertClientForBooking({ ownerName, dogName, dogSize, phone, email, address, dogBirthday, referralCode }) {
   const key = normalizePhone(phone);
   let client = clients.find((c) => c.normalizedPhone === key);
   let referralDiscountCents = 0;
@@ -246,10 +279,12 @@ function upsertClientForBooking({ ownerName, dogName, dogSize, phone, address, r
       id: crypto.randomUUID(),
       normalizedPhone: key,
       phone,
+      email: email || '',
       ownerName,
       dogName,
       dogSize,
       address,
+      dogBirthday: dogBirthday || '',
       notes: '',
       tags: ['new'],
       referralCode: generateReferralCode(ownerName, phone),
@@ -265,6 +300,8 @@ function upsertClientForBooking({ ownerName, dogName, dogSize, phone, address, r
     client.dogSize = dogSize;
     client.address = address;
     client.phone = phone;
+    if (email) client.email = email;
+    if (dogBirthday) client.dogBirthday = dogBirthday;
     client.updatedAt = new Date().toISOString();
   }
 
@@ -401,14 +438,37 @@ function buildSchedule() {
   let upcomingCents = 0;
   let completedWalks = 0;
   let dogsWalked = 0;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const weekStart = new Date(today);
+  weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const isoOf = (d) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const weekStartIso = isoOf(weekStart);
+  const monthStartIso = isoOf(monthStart);
+
+  let walksThisWeek = 0;
+  let earnedThisWeekCents = 0;
+  let walksThisMonth = 0;
+  let earnedThisMonthCents = 0;
+
   for (const walk of walks) {
     if (walk.status === STATUS.DONE) {
       completedWalks += 1;
     }
+    const inThisWeek = walk.date >= weekStartIso;
+    const inThisMonth = walk.date >= monthStartIso;
+    if (inThisWeek) walksThisWeek += 1;
+    if (inThisMonth) walksThisMonth += 1;
+
     for (const dog of walk.dogs) {
       if (dog.status === STATUS.DONE) {
         earnedCents += dog.priceCents;
         dogsWalked += 1;
+        if (inThisWeek) earnedThisWeekCents += dog.priceCents;
+        if (inThisMonth) earnedThisMonthCents += dog.priceCents;
       } else {
         upcomingCents += dog.priceCents;
       }
@@ -417,7 +477,16 @@ function buildSchedule() {
 
   return {
     walks,
-    stats: { earnedCents, upcomingCents, completedWalks, dogsWalked },
+    stats: {
+      earnedCents,
+      upcomingCents,
+      completedWalks,
+      dogsWalked,
+      walksThisWeek,
+      earnedThisWeekCents,
+      walksThisMonth,
+      earnedThisMonthCents,
+    },
   };
 }
 
@@ -450,7 +519,13 @@ app.get('/api/config', (req, res) => {
 
 // Returning-client lookup so the booking form can autofill dog details.
 // Only returns booking-relevant fields — never notes, tags or credit balance.
+// Rate-limited per IP so this can't be used to enumerate other clients'
+// names and addresses by guessing phone numbers.
 app.get('/api/clients/lookup', (req, res) => {
+  if (!underRateLimit('lookup:' + clientIp(req), 30, 10 * 60 * 1000)) {
+    res.status(429).json({ error: 'Too many lookups — please wait a bit and try again.' });
+    return;
+  }
   const phone = String(req.query.phone || '');
   if (normalizePhone(phone).length < 7) {
     res.json({ found: false });
@@ -467,6 +542,8 @@ app.get('/api/clients/lookup', (req, res) => {
     dogName: client.dogName,
     dogSize: client.dogSize,
     address: client.address,
+    email: client.email || '',
+    dogBirthday: client.dogBirthday || '',
   });
 });
 
@@ -477,11 +554,13 @@ app.post('/api/bookings', (req, res) => {
   const dogName = String(body.dogName || '').trim();
   const dogSize = String(body.dogSize || '').trim();
   const phone = String(body.phone || '').trim();
+  const email = String(body.email || '').trim().slice(0, 200);
   const address = String(body.address || '').trim();
   const date = String(body.date || '').trim();
   const slot = String(body.slot || '').trim();
   const duration = Number(body.duration);
   const notes = String(body.notes || '').trim().slice(0, 500);
+  const dogBirthday = String(body.dogBirthday || '').trim().slice(0, 60);
   const referralCode = String(body.referralCode || '').trim();
   const vaccinatedAgreed = body.vaccinatedAgreed === true;
   const waiverAgreed = body.waiverAgreed === true;
@@ -518,6 +597,22 @@ app.post('/api/bookings', (req, res) => {
     return;
   }
 
+  // Guard against duplicate submissions (double-click, a retried request, or
+  // an intentional repeat) — the same dog can't book the identical slot twice.
+  const duplicate = bookings.find(
+    (b) =>
+      isActive(b) &&
+      b.date === date &&
+      b.slot === slot &&
+      b.normalizedPhone === normalizePhone(phone)
+  );
+  if (duplicate) {
+    res.status(409).json({
+      error: `Looks like ${dogName} is already booked for ${date} at ${slot}. If you need to change something, text Kaylee at 587-433-2199.`,
+    });
+    return;
+  }
+
   // Kaylee can only be in one place at a time: a slot holds one walk of up
   // to three dogs, and every dog in it walks for the same length.
   const sameSlot = bookings.filter(
@@ -535,6 +630,29 @@ app.post('/api/bookings', (req, res) => {
       error: `That slot already has a ${differentLength.duration}-minute walk booked. Pick the ${differentLength.duration}-minute option to join it, or choose a different time.`,
     });
     return;
+  }
+
+  // A walk's actual duration can run into the next slot (e.g. a 60-minute
+  // walk at 6:00 PM runs until 7:00 PM) — block anything that would put
+  // Kaylee in two places at once, even across different walk groups.
+  const newStart = slotToMinutes(slot);
+  const newEnd = newStart + duration;
+  const otherWalksOnDate = new Map();
+  for (const b of bookings) {
+    if (!isActive(b) || b.date !== date) continue;
+    otherWalksOnDate.set(walkKey(b), b);
+  }
+  for (const other of otherWalksOnDate.values()) {
+    if (other.slot === slot && other.duration === duration) continue; // same walk group, already handled above
+    const otherStart = slotToMinutes(other.slot);
+    const otherEnd = otherStart + other.duration;
+    if (otherStart === null || newStart === null) continue;
+    if (newStart < otherEnd && otherStart < newEnd) {
+      res.status(409).json({
+        error: `That overlaps with a walk already booked at ${other.slot} (${other.duration} min) — Kaylee can't be two places at once! Please pick a time that doesn't overlap.`,
+      });
+      return;
+    }
   }
 
   let referralDiscountCents = 0;
@@ -555,12 +673,14 @@ app.post('/api/bookings', (req, res) => {
     dogName,
     dogSize,
     phone,
+    email,
     normalizedPhone: normalizePhone(phone),
     address,
     date,
     slot,
     duration,
     notes,
+    dogBirthday,
     vaccinatedAgreed,
     waiverAgreed,
     waiverAgreedAt: new Date().toISOString(),
@@ -576,7 +696,9 @@ app.post('/api/bookings', (req, res) => {
     dogName,
     dogSize,
     phone,
+    email,
     address,
+    dogBirthday,
     referralCode,
   });
   booking.referralDiscountCents = creditCents;
@@ -721,6 +843,19 @@ app.patch('/api/clients/:id', requirePasscode, (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// Backup export — a full dump of clients + bookings so Kaylee never loses
+// her client list even if this server/disk goes away. Passcode-protected.
+// ---------------------------------------------------------------------------
+
+app.get('/api/export', requirePasscode, (req, res) => {
+  const exportedAt = new Date().toISOString();
+  const filename = `kaylees-dog-walking-backup-${exportedAt.slice(0, 10)}.json`;
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.setHeader('Content-Type', 'application/json');
+  res.json({ exportedAt, clients, bookings });
+});
+
+// ---------------------------------------------------------------------------
 // Payment preferences
 // ---------------------------------------------------------------------------
 
@@ -819,7 +954,7 @@ app.post('/api/emails/send', requirePasscode, (req, res) => {
       id: crypto.randomUUID(),
       templateId: template ? template.id : 'custom',
       clientId: client.id,
-      to: client.ownerName,
+      to: client.email ? `${client.ownerName} <${client.email}>` : `${client.ownerName} (no email on file)`,
       subject,
       body: text,
       status: 'queued — not sent (no email provider connected)',

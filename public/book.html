@@ -58,10 +58,18 @@
                 <option value="" disabled selected>Choose…</option>
               </select>
             </div>
+            <div>
+              <label for="email">Email <span class="opt">(optional)</span></label>
+              <input id="email" name="email" type="email" autocomplete="email" maxlength="200" placeholder="e.g. jordan@email.com">
+            </div>
             <div class="full">
               <label for="address">Street address</label>
               <input id="address" name="address" type="text" autocomplete="street-address" required maxlength="120" placeholder="e.g. 128 Prestwick Ave SE">
               <p class="hint">I use the street to match you with neighbour group walks and plan the route.</p>
+            </div>
+            <div>
+              <label for="dogBirthday">Dog's birthday or gotcha day <span class="opt">(optional)</span></label>
+              <input id="dogBirthday" name="dogBirthday" type="text" maxlength="60" placeholder="e.g. July 4th">
             </div>
             <div>
               <label for="date">Date</label>
@@ -97,6 +105,7 @@
                 <div class="liability-body">
                   <p><strong>By booking a walk, I confirm</strong> my dog is up to date on vaccinations, is not aggressive toward people or other dogs, and I am the dog's owner or authorized to arrange this walk on their behalf. I understand walks may include time with other dogs in a group.</p>
                   <p>I release Kaylee's Dog Walking Service and Kaylee from liability for injury, loss, or property damage that occurs during a walk, except in cases of gross negligence. I consent to photos of my dog being taken during walks and used for the business's marketing, unless I opt out below. I understand payment is due at the time of the walk or as otherwise agreed.</p>
+                  <p><strong>Cancellation policy:</strong> please give at least 24 hours' notice to cancel or reschedule a walk — just call or text 587-433-2199. Walks cancelled with less than 24 hours' notice, or missed without any notice, may still be charged in full, since that time was held for your dog.</p>
                 </div>
               </details>
               <label class="checkbox-row" style="margin-top:14px;">
@@ -116,7 +125,7 @@
               <button id="submit-btn" class="btn btn-gold" type="submit">Book my walk</button>
             </div>
           </div>
-          <div id="form-msg" class="form-msg" hidden></div>
+          <div id="form-msg" class="form-msg" role="alert" hidden></div>
         </form>
 
         <p class="hand" style="font-size:1.35rem; margin-top:24px;">see you and your pup on the paths soon!</p>

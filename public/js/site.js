@@ -128,8 +128,17 @@
     if (event.target === lightbox) closeLightbox();
   });
   document.addEventListener('keydown', function (event) {
-    if (event.key === 'Escape' && lightbox.classList.contains('open')) {
+    if (!lightbox.classList.contains('open')) return;
+    if (event.key === 'Escape') {
       closeLightbox();
+      return;
+    }
+    // Focus trap: closeBtn is the only focusable element inside the
+    // lightbox, so keep Tab/Shift+Tab from leaking focus to the page
+    // underneath while the modal is open.
+    if (event.key === 'Tab') {
+      event.preventDefault();
+      closeBtn.focus();
     }
   });
 })();

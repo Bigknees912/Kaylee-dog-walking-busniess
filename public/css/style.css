@@ -16,6 +16,9 @@
   --white: #FFFFFF;
   --terracotta: #CD7A4E;
   --honey: #EFAE6B;
+  /* Darker gold for text on light backgrounds — --gold itself is ~2:1
+     contrast on white/mist and fails WCAG AA; this passes at ~5:1. */
+  --gold-ink: #8A6420;
   --font-display: "Bricolage Grotesque", "Outfit", sans-serif;
   --font-body: "Outfit", sans-serif;
   --font-hand: "Nothing You Could Do", cursive;
@@ -237,7 +240,7 @@ img { max-width: 100%; }
 
 .hero-kicker {
   font-family: var(--font-hand);
-  color: var(--gold);
+  color: var(--gold-ink);
   font-size: 1.35rem;
   margin-bottom: 8px;
 }
@@ -398,7 +401,7 @@ img { max-width: 100%; }
 
 .section-kicker {
   font-family: var(--font-hand);
-  color: var(--gold);
+  color: var(--gold-ink);
   font-size: 1.3rem;
   margin-bottom: 4px;
 }
@@ -754,7 +757,7 @@ html.js .reveal.in {
 
 .review-card { position: relative; }
 
-.review-card .stars { color: var(--gold); letter-spacing: 3px; margin-bottom: 8px; }
+.review-card .stars { color: var(--gold-ink); letter-spacing: 3px; margin-bottom: 8px; }
 
 .review-card .who {
   font-weight: 600;
@@ -807,7 +810,7 @@ html.js .reveal.in {
   content: "+";
   font-size: 1.2rem;
   line-height: 1;
-  color: var(--gold);
+  color: var(--gold-ink);
   transition: transform 0.25s var(--ease-out);
 }
 
