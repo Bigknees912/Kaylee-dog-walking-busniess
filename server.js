@@ -12,6 +12,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { Pool } = require('pg');
 
 const PORT = process.env.PORT || 3000;
 
@@ -100,7 +101,14 @@ const PAYMENT_METHOD_LABELS = {
 const REGULAR_AFTER_WALKS = 3;
 
 // ---------------------------------------------------------------------------
-// Storage — one small JSON file per collection, written atomically.
+// Storage — one small JSON blob per collection, written atomically.
+//
+// Locally and on Render this is a JSON file per collection (unchanged). When
+// POSTGRES_URL/DATABASE_URL is set (Vercel + a provisioned Postgres database)
+// each collection instead lives as one row of a key/value table, since
+// Vercel's serverless functions have a read-only filesystem outside /tmp and
+// no state survives between invocations. See README's "Deploying to Vercel"
+// section.
 // ---------------------------------------------------------------------------
 
 let bookings = [];
@@ -113,7 +121,56 @@ let accounts = [];
 let sessions = [];
 let gcal = { refreshToken: null, accessToken: null, accessTokenExpiry: 0, email: '', lastSyncAt: null, lastError: null };
 
-function makeStore(file, initial) {
+const DATABASE_URL = process.env.POSTGRES_URL || process.env.DATABASE_URL || '';
+const usingDb = Boolean(DATABASE_URL);
+
+const dbPool = usingDb ? new Pool({ connectionString: DATABASE_URL, ssl: { rejectUnauthorized: false } }) : null;
+
+// Vercel freezes a function instance right after the response is sent, which
+// would cut off an in-flight database write that was never awaited. waitUntil
+// keeps the instance alive until the given promise settles, without delaying
+// the response itself. It's a no-op (runs the promise normally) anywhere else.
+let waitUntil = (promise) => promise;
+if (usingDb) {
+  try {
+    waitUntil = require('@vercel/functions').waitUntil;
+  } catch (err) {
+    console.warn('@vercel/functions not installed — background database writes are not guaranteed to finish before the function freezes.');
+  }
+}
+
+let dbSchemaReady = null;
+function ensureDbSchema() {
+  if (!dbSchemaReady) {
+    dbSchemaReady = dbPool.query('CREATE TABLE IF NOT EXISTS kv_store (key TEXT PRIMARY KEY, value JSONB NOT NULL)');
+  }
+  return dbSchemaReady;
+}
+
+function makeStore(file, initial, dbKey) {
+  if (usingDb) {
+    return {
+      async load() {
+        await ensureDbSchema();
+        const { rows } = await dbPool.query('SELECT value FROM kv_store WHERE key = $1', [dbKey]);
+        return rows.length ? rows[0].value : initial;
+      },
+      save(data) {
+        const p = ensureDbSchema()
+          .then(() =>
+            dbPool.query(
+              'INSERT INTO kv_store (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value',
+              [dbKey, JSON.stringify(data)]
+            )
+          )
+          .catch((err) => {
+            console.error(`Could not save ${dbKey} to the database:`, err.message);
+          });
+        waitUntil(p);
+        return p;
+      },
+    };
+  }
   return {
     load() {
       try {
@@ -135,15 +192,15 @@ function makeStore(file, initial) {
   };
 }
 
-const bookingsStore = makeStore(DATA_FILE, []);
-const clientsStore = makeStore(CLIENTS_FILE, []);
-const settingsStore = makeStore(SETTINGS_FILE, settings);
-const notificationsStore = makeStore(NOTIFICATIONS_FILE, []);
-const emailTemplatesStore = makeStore(EMAIL_TEMPLATES_FILE, []);
-const emailLogStore = makeStore(EMAIL_LOG_FILE, []);
-const accountsStore = makeStore(ACCOUNTS_FILE, []);
-const sessionsStore = makeStore(SESSIONS_FILE, []);
-const gcalStore = makeStore(GCAL_FILE, gcal);
+const bookingsStore = makeStore(DATA_FILE, [], 'bookings');
+const clientsStore = makeStore(CLIENTS_FILE, [], 'clients');
+const settingsStore = makeStore(SETTINGS_FILE, settings, 'settings');
+const notificationsStore = makeStore(NOTIFICATIONS_FILE, [], 'notifications');
+const emailTemplatesStore = makeStore(EMAIL_TEMPLATES_FILE, [], 'emailTemplates');
+const emailLogStore = makeStore(EMAIL_LOG_FILE, [], 'emailLog');
+const accountsStore = makeStore(ACCOUNTS_FILE, [], 'accounts');
+const sessionsStore = makeStore(SESSIONS_FILE, [], 'sessions');
+const gcalStore = makeStore(GCAL_FILE, gcal, 'gcal');
 
 function saveBookings() { bookingsStore.save(bookings); }
 function saveClients() { clientsStore.save(clients); }
@@ -1032,6 +1089,20 @@ app.use((req, res, next) => {
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   }
   next();
+});
+
+// ---------------------------------------------------------------------------
+// Storage readiness gate. Locally/on Render this resolves once, instantly
+// (loadAllStores() has already run by the time app.listen() fires — see the
+// bottom of this file). On Vercel with a Postgres backend, a cold-started
+// function instance must not serve a request before its first DB read
+// completes, so this awaits that one-time load per instance before letting
+// any /api request through. See the comment on ensureReady() near the bottom
+// of this file for why it's once-per-instance rather than once-per-request.
+// ---------------------------------------------------------------------------
+
+app.use('/api', (req, res, next) => {
+  ensureReady().then(() => next(), next);
 });
 
 // ---------------------------------------------------------------------------
@@ -2214,27 +2285,63 @@ app.use((err, req, res, next) => {
   });
 });
 
-bookings = bookingsStore.load();
-clients = clientsStore.load();
-settings = Object.assign({ paymentMethods: { etransfer: true, cash: true, stripe: false } }, settingsStore.load());
-notifications = notificationsStore.load();
-emailTemplates = emailTemplatesStore.load();
-if (!Array.isArray(emailTemplates) || emailTemplates.length === 0) {
-  emailTemplates = DEFAULT_EMAIL_TEMPLATES.map((t) => ({ ...t }));
-  saveEmailTemplates();
-}
-emailLog = emailLogStore.load();
-accounts = accountsStore.load();
-sessions = sessionsStore.load();
-gcal = Object.assign(gcal, gcalStore.load());
-// Drop any sessions that expired while the server was down.
-const nowMs = Date.now();
-const livingSessions = sessions.filter((s) => s.expiresAt > nowMs);
-if (livingSessions.length !== sessions.length) {
-  sessions = livingSessions;
-  saveSessions();
+async function loadAllStores() {
+  bookings = await bookingsStore.load();
+  clients = await clientsStore.load();
+  settings = Object.assign({ paymentMethods: { etransfer: true, cash: true, stripe: false } }, await settingsStore.load());
+  notifications = await notificationsStore.load();
+  emailTemplates = await emailTemplatesStore.load();
+  if (!Array.isArray(emailTemplates) || emailTemplates.length === 0) {
+    emailTemplates = DEFAULT_EMAIL_TEMPLATES.map((t) => ({ ...t }));
+    saveEmailTemplates();
+  }
+  emailLog = await emailLogStore.load();
+  accounts = await accountsStore.load();
+  sessions = await sessionsStore.load();
+  gcal = Object.assign(gcal, await gcalStore.load());
+  // Drop any sessions that expired while the server was down.
+  const nowMs = Date.now();
+  const livingSessions = sessions.filter((s) => s.expiresAt > nowMs);
+  if (livingSessions.length !== sessions.length) {
+    sessions = livingSessions;
+    saveSessions();
+  }
 }
 
-app.listen(PORT, () => {
-  console.log(`Kaylee's Dog Walking Service is up at http://localhost:${PORT}`);
-});
+// Load once per warm instance (file-backed: once ever, at boot; DB-backed:
+// once per cold start), then serve every request after that straight out of
+// memory — exactly like the original file-based code always did. Reloading
+// on every single request instead was tried and reverted: save() doesn't
+// wait for the database write to land before the response goes out (that's
+// the whole point of waitUntil — it keeps the write going in the background
+// without delaying the response), so an immediate next request could reload
+// a split second before its own previous write had actually committed and
+// see stale data. Caching per-instance avoids that race entirely for
+// same-instance traffic. The tradeoff: a write from one concurrent Vercel
+// instance isn't visible to a *different* instance until that instance's own
+// next cold start. For this app's traffic (a single dog walker's booking
+// site), that's an acceptable, honest limitation — see README.
+let readyPromise = null;
+function ensureReady() {
+  if (!readyPromise) readyPromise = loadAllStores();
+  return readyPromise;
+}
+
+module.exports = app;
+
+// Vercel imports `app` (via api/index.js) and calls it as a request handler
+// directly — it never runs this file as a standalone process, so app.listen()
+// must not run there. Locally and on Render, this is what actually starts
+// the server.
+if (!process.env.VERCEL) {
+  ensureReady()
+    .then(() => {
+      app.listen(PORT, () => {
+        console.log(`Kaylee's Dog Walking Service is up at http://localhost:${PORT}`);
+      });
+    })
+    .catch((err) => {
+      console.error('Failed to start:', err);
+      process.exit(1);
+    });
+}

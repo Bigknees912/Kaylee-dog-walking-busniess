@@ -186,3 +186,45 @@ To use a custom domain later (e.g. `kayleesdogwalking.ca`), buy it at any
 registrar, add it under the Render service's **Settings → Custom Domains**,
 and point the DNS `CNAME` where Render tells you. Then regenerate the QR code
 and reprint.
+
+## Deploying to Vercel
+
+Render (above) is the simpler default — it's a normal always-on server, so
+the JSON file storage just works. Vercel runs this app as a serverless
+function instead, which has no persistent disk, so it needs a real database.
+`server.js` already supports both: set `POSTGRES_URL` or `DATABASE_URL` and
+it automatically stores everything in Postgres instead of `data/*.json`,
+with no other changes needed.
+
+1. **Provision a Postgres database.** Easiest path: in the Vercel dashboard,
+   open your project → **Storage** tab → **Create Database** → **Postgres**
+   (this uses Neon under the hood and needs no separate signup). Connecting
+   it to the project auto-sets `POSTGRES_URL` for you — skip to step 3.
+   Alternatively, use any Postgres host (Neon, Supabase, etc. directly) and
+   set `DATABASE_URL` yourself in step 2.
+2. **Import the repo.** [vercel.com/new](https://vercel.com/new) → import
+   `Bigknees912/Kaylee-dog-walking-busniess` → it'll detect `vercel.json`
+   automatically, no build settings to change.
+3. **Set environment variables** (Project → Settings → Environment
+   Variables):
+   - `KAYLEE_PASSCODE` — required, don't use the default.
+   - `BASE_URL` — your Vercel URL, e.g. `https://your-project.vercel.app`
+     (needed for Google sign-in redirects; the site works without it too).
+   - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — optional, only if you want
+     "Sign in with Google" / Calendar sync live on this deployment.
+4. **Deploy.** Vercel builds and deploys automatically on push once the repo
+   is imported.
+
+**One tradeoff to know about:** unlike Render (a single always-on process),
+Vercel can run several instances of the function at once under load. Each
+instance loads its own in-memory copy of the data on cold start and keeps
+serving from that copy afterward — a booking made on one instance won't be
+visible on a different concurrent instance until *that* instance's next cold
+start. For a single dog walker's booking volume this is a non-issue in
+practice (traffic is far too low to hit real concurrency), but it's not the
+strict same-request consistency a single Render process gives you for free.
+
+To test the Postgres-backed path locally before deploying, run:
+```
+DATABASE_URL=postgresql://user:pass@host/db KAYLEE_PASSCODE=yourpasscode npm start
+```

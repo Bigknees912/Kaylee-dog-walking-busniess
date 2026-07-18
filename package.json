@@ -10,6 +10,8 @@
     "node": ">=18"
   },
   "dependencies": {
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "pg": "^8.13.1",
+    "@vercel/functions": "^1.5.0"
   }
 }
