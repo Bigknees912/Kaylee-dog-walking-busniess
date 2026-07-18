@@ -275,16 +275,29 @@ function safeEqual(a, b) {
   return crypto.timingSafeEqual(ha, hb);
 }
 
-function requirePasscode(req, res, next) {
-  const supplied = req.get('x-passcode') || req.query.passcode || '';
-  if (!safeEqual(supplied, PASSCODE)) {
+function checkPasscode(supplied, req, res) {
+  if (!safeEqual(supplied || '', PASSCODE)) {
     if (!underRateLimit('passcode-fail:' + clientIp(req), 20, 15 * 60 * 1000)) {
       res.status(429).json({ error: 'Too many attempts — please wait a few minutes and try again.' });
-      return;
+      return false;
     }
     res.status(401).json({ error: 'Wrong passcode.' });
-    return;
+    return false;
   }
+  return true;
+}
+
+// Used by JSON API routes: header-only, so the passcode never ends up in a URL,
+// server access log, browser history, or Referer header.
+function requirePasscode(req, res, next) {
+  if (!checkPasscode(req.get('x-passcode'), req, res)) return;
+  next();
+}
+
+// Used only by plain <a href> navigations (like the Google Calendar connect
+// link) that can't attach a custom header. Keep this off JSON API routes.
+function requirePasscodeQuery(req, res, next) {
+  if (!checkPasscode(req.get('x-passcode') || req.query.passcode, req, res)) return;
   next();
 }
 
@@ -1662,8 +1675,14 @@ app.get('/api/auth/google/callback', async (req, res) => {
     const name = String(prof.name || '').slice(0, 80);
     if (!email || !googleId) throw new Error('Google profile missing email');
 
+    // Only auto-link a Google identity to an existing account by email when that
+    // account has no password set. A password-protected account's email was never
+    // proven to belong to whoever set the password, so merging here would let an
+    // attacker who pre-registered a victim's email hijack the victim's real Google
+    // sign-in into the attacker's account.
     let account =
-      accounts.find((a) => a.googleId === googleId) || accounts.find((a) => a.email === email);
+      accounts.find((a) => a.googleId === googleId) ||
+      accounts.find((a) => a.email === email && !a.passwordHash);
     if (!account) {
       account = {
         id: crypto.randomUUID(),
@@ -1767,6 +1786,10 @@ app.patch('/api/account/dogs/:id', requireAuth, (req, res) => {
     return;
   }
   sanitizeDog(req.body || {}, dog);
+  if (!dog.name) {
+    res.status(400).json({ error: "Please give your dog a name." });
+    return;
+  }
   account.updatedAt = new Date().toISOString();
   saveAccounts();
   notifyDogChange(account, 'updated the', dog.name);
@@ -1838,7 +1861,7 @@ app.get('/api/gcal/status', requirePasscode, (req, res) => {
   });
 });
 
-app.get('/api/gcal/connect', requirePasscode, (req, res) => {
+app.get('/api/gcal/connect', requirePasscodeQuery, (req, res) => {
   if (!googleEnabled()) {
     res.status(503).json({ error: 'Google credentials are not configured yet — see the README.' });
     return;
@@ -2112,8 +2135,8 @@ app.post('/api/admin/bookings', requirePasscode, (req, res) => {
 
 app.post('/api/admin/clients', requirePasscode, (req, res) => {
   const body = req.body || {};
-  const ownerName = String(body.ownerName || '').trim();
-  const phone = String(body.phone || '').trim();
+  const ownerName = String(body.ownerName || '').trim().slice(0, 80);
+  const phone = String(body.phone || '').trim().slice(0, 25);
   if (!ownerName || phone.replace(/\D/g, '').length < 7) {
     res.status(400).json({ error: 'A name and a valid phone number are required.' });
     return;

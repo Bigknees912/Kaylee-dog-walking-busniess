@@ -306,8 +306,11 @@ a.nav-cta:active { transform: scale(0.97); }
 
 /* ---------- buttons ---------- */
 
-.btn {
+.btn:not([hidden]) {
   display: inline-block;
+}
+
+.btn {
   border: 0;
   cursor: pointer;
   text-decoration: none;
@@ -1160,6 +1163,7 @@ textarea { resize: vertical; min-height: 90px; }
 
 .walk-status.booked { background: rgba(223, 165, 66, 0.2); color: #8a6420; }
 .walk-status.done { background: rgba(169, 211, 232, 0.45); color: var(--teal); }
+.walk-status.cancelled { background: rgba(200, 80, 70, 0.15); color: #a3372b; }
 
 .dog-row {
   display: flex;

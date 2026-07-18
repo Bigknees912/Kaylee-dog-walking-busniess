@@ -529,7 +529,8 @@
       var card = el('div', 'card booking-row');
       var head = el('div', 'booking-head');
       head.appendChild(el('strong', null, friendlyDate(b.date) + ' · ' + b.slot));
-      head.appendChild(el('span', 'walk-status ' + (b.status === 'booked' ? 'booked' : 'done'),
+      var statusClass = b.status === 'booked' ? 'booked' : b.status === 'done' ? 'done' : 'cancelled';
+      head.appendChild(el('span', 'walk-status ' + statusClass,
         b.status === 'booked' ? 'Booked' : b.status === 'done' ? 'Done' : 'Cancelled'));
       card.appendChild(head);
       card.appendChild(el('div', 'dog-sub', b.dogName + ' · ' + b.duration + ' min · ' + b.address));

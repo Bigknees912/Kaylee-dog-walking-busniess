@@ -841,6 +841,7 @@
           dogName: document.getElementById('ac-dog').value.trim(),
           dogSize: document.getElementById('ac-size').value,
           address: document.getElementById('ac-address').value.trim(),
+          dogBirthday: document.getElementById('ac-birthday').value.trim(),
           notes: document.getElementById('ac-notes').value.trim(),
         }),
       })
