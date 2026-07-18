@@ -20,14 +20,25 @@
         <img src="/img/paw.svg" alt="Kaylee's Dog Walking Service paw print logo">
         <span class="brand-name">Kaylee's Dog Walking Service<small>McKenzie Towne, Calgary</small></span>
       </a>
-      <nav class="site-nav">
+      <nav class="site-nav dropdown-panel" id="site-nav" hidden>
         <a href="/">Home</a>
         <a href="/about.html">About</a>
         <a href="/services.html">Services</a>
         <a href="/reviews.html">Reviews</a>
-        <a href="/account.html">My account</a>
-        <a href="/book.html" class="nav-cta">Book a walk</a>
+        <a href="/book.html" class="nav-cta-mobile">Book a walk</a>
       </nav>
+      <div class="header-actions">
+        <a href="/book.html" class="nav-cta">Book a walk</a>
+        <button class="icon-btn nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Open menu">
+          <span></span><span></span><span></span>
+        </button>
+        <div class="profile-wrap">
+          <button class="icon-btn profile-btn" type="button" aria-expanded="false" aria-haspopup="true" aria-controls="profile-menu" aria-label="Account menu">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.8"/><path d="M4 20c1.5-4 5-6 8-6s6.5 2 8 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          </button>
+          <div class="profile-menu dropdown-panel" id="profile-menu" hidden></div>
+        </div>
+      </div>
     </div>
   </header>
 

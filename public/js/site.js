@@ -8,6 +8,110 @@
   var reducedMotion =
     window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  // ----- header: hamburger menu + profile dropdown (every page) -----
+  (function () {
+    var navToggle = document.querySelector('.nav-toggle');
+    var siteNav = document.getElementById('site-nav');
+    var profileBtn = document.querySelector('.profile-btn');
+    var profileMenu = document.getElementById('profile-menu');
+    if (!profileBtn || !profileMenu) return;
+
+    function closeMenu() {
+      if (siteNav && !siteNav.hidden) {
+        siteNav.hidden = true;
+        navToggle.setAttribute('aria-expanded', 'false');
+      }
+      if (!profileMenu.hidden) {
+        profileMenu.hidden = true;
+        profileBtn.setAttribute('aria-expanded', 'false');
+      }
+    }
+
+    if (navToggle && siteNav) {
+      navToggle.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var willOpen = siteNav.hidden;
+        closeMenu();
+        if (willOpen) {
+          siteNav.hidden = false;
+          navToggle.setAttribute('aria-expanded', 'true');
+        }
+      });
+    }
+
+    function makeLink(href, text) {
+      var a = document.createElement('a');
+      a.href = href;
+      a.textContent = text;
+      return a;
+    }
+
+    function renderProfileMenu(account) {
+      profileMenu.innerHTML = '';
+      if (account) {
+        profileBtn.classList.add('has-account');
+        var nameBlock = document.createElement('div');
+        nameBlock.className = 'profile-name';
+        nameBlock.textContent = account.name || account.email;
+        var small = document.createElement('small');
+        small.textContent = account.email;
+        nameBlock.appendChild(small);
+        profileMenu.appendChild(nameBlock);
+        profileMenu.appendChild(Object.assign(document.createElement('div'), { className: 'menu-divider' }));
+        profileMenu.appendChild(makeLink('/account.html?tab=bookings', 'My bookings'));
+        profileMenu.appendChild(makeLink('/account.html?tab=dogs', 'Dog profiles'));
+        profileMenu.appendChild(makeLink('/account.html?tab=settings', 'Account settings'));
+        profileMenu.appendChild(Object.assign(document.createElement('div'), { className: 'menu-divider' }));
+        var logoutBtn = document.createElement('button');
+        logoutBtn.type = 'button';
+        logoutBtn.className = 'menu-item';
+        logoutBtn.textContent = 'Log out';
+        logoutBtn.addEventListener('click', function () {
+          logoutBtn.disabled = true;
+          fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' })
+            .catch(function () {})
+            .finally(function () {
+              window.location.href = '/';
+            });
+        });
+        profileMenu.appendChild(logoutBtn);
+      } else {
+        profileMenu.appendChild(makeLink('/account.html', 'Log in'));
+        profileMenu.appendChild(makeLink('/account.html?tab=signup', 'Sign up'));
+      }
+    }
+
+    profileBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var willOpen = profileMenu.hidden;
+      closeMenu();
+      if (willOpen) {
+        profileMenu.hidden = false;
+        profileBtn.setAttribute('aria-expanded', 'true');
+      }
+    });
+
+    document.addEventListener('click', function (e) {
+      if (siteNav && !siteNav.hidden && !siteNav.contains(e.target) && !navToggle.contains(e.target)) {
+        siteNav.hidden = true;
+        navToggle.setAttribute('aria-expanded', 'false');
+      }
+      if (!profileMenu.hidden && !profileMenu.contains(e.target) && !profileBtn.contains(e.target)) {
+        profileMenu.hidden = true;
+        profileBtn.setAttribute('aria-expanded', 'false');
+      }
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closeMenu();
+    });
+
+    fetch('/api/auth/me', { credentials: 'same-origin' })
+      .then(function (res) { return res.json(); })
+      .then(function (data) { renderProfileMenu(data && data.account); })
+      .catch(function () { renderProfileMenu(null); });
+  })();
+
   // ----- word-by-word headline reveals -----
   // Split marked headlines into per-word spans with a small stagger. The
   // stagger is capped so the whole headline finishes within ~600ms.

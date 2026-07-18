@@ -68,6 +68,13 @@
       return;
     }
 
+    // Deep link from the profile menu (?tab=signup) — logged-out only;
+    // enterAccount() handles the logged-in equivalents (bookings/dogs/settings).
+    if (params.get('tab') === 'signup') {
+      var signupTab = document.querySelector('[data-authtab="signup"]');
+      if (signupTab) signupTab.click();
+    }
+
     j('/api/auth/me').then(function (r) {
       if (r.body && r.body.googleAuthEnabled) show(document.getElementById('google-block'));
       if (r.body && r.body.account) {
@@ -125,7 +132,22 @@
       method: 'POST',
       body: JSON.stringify({ email: document.getElementById('forgot-email').value.trim() }),
     }).then(function (r) {
-      setMsg(authMsg, (r.body && (r.body.message || r.body.error)) || 'Check your messages for a reset link.', r.ok);
+      if (r.ok) {
+        // The account may or may not exist — the server's wording stays
+        // generic on purpose so this can't be used to discover emails.
+        // Add the practical next step separately, since there's no email
+        // provider connected yet: Kaylee sees the link in her dashboard.
+        forgotForm.reset();
+        setMsg(
+          authMsg,
+          (r.body.message || 'If that email has an account, a reset link is on its way.') +
+            ' Text or call Kaylee at 587-433-2199 and ask her to send you the link from her dashboard — ' +
+            "she'll see it under Messages the moment you submit this.",
+          true
+        );
+      } else {
+        setMsg(authMsg, r.body.error || 'Could not send a reset link — please try again.', false);
+      }
     }).catch(function () {
       setMsg(authMsg, 'Could not reach the server — please try again.', false);
     }).finally(function () { btn.disabled = false; });
@@ -203,6 +225,14 @@
     renderPauseState();
     loadDogs();
     loadBookings();
+
+    // Deep link from the profile menu, e.g. "My bookings" -> ?tab=bookings.
+    var requestedTab = new URLSearchParams(window.location.search).get('tab');
+    if (requestedTab === 'bookings' || requestedTab === 'dogs' || requestedTab === 'settings') {
+      history.replaceState(null, '', '/account.html');
+      var target = document.querySelector('#account-view .dash-tab[data-tab="' + requestedTab + '"]');
+      if (target) target.click();
+    }
   }
 
   document.getElementById('logout-btn').addEventListener('click', function () {
