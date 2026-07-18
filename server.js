@@ -268,9 +268,16 @@ function underRateLimit(key, max, windowMs) {
   return hits.length <= max;
 }
 
+/** Constant-time string compare (hash first so lengths never leak). */
+function safeEqual(a, b) {
+  const ha = crypto.createHash('sha256').update(String(a)).digest();
+  const hb = crypto.createHash('sha256').update(String(b)).digest();
+  return crypto.timingSafeEqual(ha, hb);
+}
+
 function requirePasscode(req, res, next) {
   const supplied = req.get('x-passcode') || req.query.passcode || '';
-  if (supplied !== PASSCODE) {
+  if (!safeEqual(supplied, PASSCODE)) {
     if (!underRateLimit('passcode-fail:' + clientIp(req), 20, 15 * 60 * 1000)) {
       res.status(429).json({ error: 'Too many attempts — please wait a few minutes and try again.' });
       return;
@@ -979,6 +986,78 @@ const app = express();
 // Behind Render/other proxies, trust X-Forwarded-Proto so req.secure is
 // accurate and session cookies get the Secure flag over https.
 app.set('trust proxy', true);
+app.disable('x-powered-by'); // don't advertise the framework
+
+// ---------------------------------------------------------------------------
+// Security headers on every response.
+// The CSP hash allows exactly one inline script (the html.js class toggle
+// used for the animation system); everything else must come from this origin
+// or Google Fonts. That blocks injected <script> tags outright, and
+// frame-ancestors 'none' stops the site being embedded for clickjacking.
+// ---------------------------------------------------------------------------
+
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'sha256-/x7W7R75k8Roq0WaVRQX9blP4OufE5xbAdzklGxsgpw='",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  'font-src https://fonts.gstatic.com',
+  "img-src 'self' data:",
+  "connect-src 'self'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+  "object-src 'none'",
+].join('; ');
+
+app.use((req, res, next) => {
+  res.setHeader('Content-Security-Policy', CSP);
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+  if (req.secure || req.get('x-forwarded-proto') === 'https') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+  next();
+});
+
+// ---------------------------------------------------------------------------
+// CSRF backstop: state-changing API requests must come from this site.
+// SameSite=Lax session cookies already stop classic cross-site form posts;
+// this rejects anything whose Origin header points somewhere else entirely.
+// (Requests without an Origin header — curl, same-origin fetches in older
+// browsers — pass through; they can't ride a victim's cookies cross-site.)
+// ---------------------------------------------------------------------------
+
+app.use('/api', (req, res, next) => {
+  if (['POST', 'PATCH', 'PUT', 'DELETE'].includes(req.method)) {
+    const origin = req.get('origin');
+    if (origin) {
+      let host = null;
+      try {
+        host = new URL(origin).host;
+      } catch (err) {
+        host = null;
+      }
+      if (!host || host !== req.get('host')) {
+        res.status(403).json({ error: 'Cross-origin request blocked.' });
+        return;
+      }
+    }
+  }
+  next();
+});
+
+// Broad per-IP ceiling across the whole API — generous for real use, but
+// stops scripted flooding (of bookings, signups, anything) cold.
+app.use('/api', (req, res, next) => {
+  if (!underRateLimit('api:' + clientIp(req), 300, 5 * 60 * 1000)) {
+    res.status(429).json({ error: 'Too many requests — please slow down and try again in a few minutes.' });
+    return;
+  }
+  next();
+});
+
 app.use(express.json({ limit: '3mb' })); // room for base64 dog photos
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -1033,14 +1112,19 @@ app.get('/api/clients/lookup', (req, res) => {
 });
 
 app.post('/api/bookings', (req, res) => {
+  // Bookings mutate data and send notifications — cap how fast one IP can fire them.
+  if (!underRateLimit('book:' + clientIp(req), 8, 10 * 60 * 1000)) {
+    res.status(429).json({ error: 'Too many bookings from this connection — please wait a few minutes, or text Kaylee at 587-433-2199.' });
+    return;
+  }
   const body = req.body || {};
 
-  const ownerName = String(body.ownerName || '').trim();
-  const dogName = String(body.dogName || '').trim();
+  const ownerName = String(body.ownerName || '').trim().slice(0, 80);
+  const dogName = String(body.dogName || '').trim().slice(0, 80);
   const dogSize = String(body.dogSize || '').trim();
-  const phone = String(body.phone || '').trim();
+  const phone = String(body.phone || '').trim().slice(0, 25);
   const email = String(body.email || '').trim().slice(0, 200);
-  const address = String(body.address || '').trim();
+  const address = String(body.address || '').trim().slice(0, 120);
   const date = String(body.date || '').trim();
   const slot = String(body.slot || '').trim();
   const duration = Number(body.duration);
@@ -1483,6 +1567,13 @@ app.post('/api/auth/login', (req, res) => {
   const body = req.body || {};
   const email = normalizeEmail(body.email);
   const password = String(body.password || '');
+
+  // Per-account limit on top of the per-IP one, so a distributed guesser
+  // can't hammer a single mailbox from many addresses.
+  if (email && !underRateLimit('login-email:' + email, 10, 15 * 60 * 1000)) {
+    res.status(429).json({ error: 'Too many attempts — please wait a few minutes and try again.' });
+    return;
+  }
 
   const account = accounts.find((a) => a.email === email);
   // Same generic error whether the email is unknown or the password is wrong,
@@ -2084,6 +2175,20 @@ app.post('/api/account/pause', requireAuth, (req, res) => {
 // Friendly 404 for unknown API routes (static pages fall through to express.static).
 app.use('/api', (req, res) => {
   res.status(404).json({ error: 'Not found.' });
+});
+
+// Last-resort error handler: log the real error server-side, never leak
+// stack traces or internals to the client (covers bad JSON bodies too).
+app.use((err, req, res, next) => {
+  if (res.headersSent) {
+    next(err);
+    return;
+  }
+  const status = err.status || err.statusCode || 500;
+  if (status >= 500) console.error('Unhandled error:', err.message);
+  res.status(status).json({
+    error: status === 400 ? 'That request could not be read — please try again.' : 'Something went wrong — please try again.',
+  });
 });
 
 bookings = bookingsStore.load();

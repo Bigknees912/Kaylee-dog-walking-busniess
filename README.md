@@ -102,6 +102,33 @@ The refresh token lives in `data/gcal.json` (gitignored). Until the
 credentials are configured, the Calendar tab says so plainly — nothing is
 faked.
 
+## Privacy & security
+
+There's a plain-language privacy policy at `/privacy.html`, linked from every
+page footer and from the booking form. The security model, in brief:
+
+- **Headers**: a strict Content-Security-Policy (scripts only from this origin
+  plus one hashed inline snippet; no third-party embeds), `nosniff`,
+  `frame-ancestors 'none'` + `X-Frame-Options: DENY` (clickjacking),
+  `Referrer-Policy`, `Permissions-Policy`, and HSTS over https.
+- **Injection**: all dynamic rendering uses `textContent` (never innerHTML
+  with user data), and the CSP blocks any injected script as a second layer.
+- **CSRF**: session cookies are `SameSite=Lax` + `HttpOnly`, and
+  state-changing API calls from a foreign Origin are rejected outright.
+- **Brute force**: per-IP rate limits on the dashboard passcode, login,
+  signup, password reset, client lookup, and bookings, plus a per-account
+  login limit and a broad API-wide ceiling; the passcode compare is
+  constant-time.
+- **Secrets at rest**: passwords are scrypt-hashed, session and reset tokens
+  are stored only as SHA-256 hashes, and the whole `data/` directory
+  (including the Google Calendar refresh token) is gitignored.
+- **Error handling**: server errors return a generic message; stack traces
+  stay in the server log.
+
+Worth knowing: the biggest remaining risks are operational, not code —
+keep `KAYLEE_PASSCODE` strong and un-shared, keep the hosting account's
+password + 2FA safe, and download a backup now and then.
+
 ## Admin extras
 
 - **Add a walk manually** (List tab) — for phone or in-person bookings; same
