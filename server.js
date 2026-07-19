@@ -1,5 +1,5 @@
 /**
- * Kaylee's Dog Walking Service — website + booking system
+ * Kaylee's Dog Walking Service: website + booking system
  *
  * Runs the whole site: static pages out of /public and a JSON API for
  * bookings, returning clients, referral credits, payment preferences,
@@ -44,7 +44,7 @@ const MIN_PASSWORD_LENGTH = 8;
 const MAX_DOGS_PER_ACCOUNT = 20;
 const MAX_DOG_PHOTO_BYTES = 2_000_000; // ~2MB data URL cap per dog photo
 
-// Google OAuth — only active when these env vars are set. Without them the
+// Google OAuth: only active when these env vars are set. Without them the
 // "Continue with Google" button is hidden and the routes return 503. To turn
 // it on: create an OAuth 2.0 Client ID in the Google Cloud console, set the
 // authorized redirect URI to <BASE_URL>/api/auth/google/callback, then set
@@ -59,7 +59,7 @@ function googleEnabled() {
 }
 
 // ---------------------------------------------------------------------------
-// Business rules (single source of truth — the booking form reads these
+// Business rules (single source of truth: the booking form reads these
 // from /api/config so the site can never drift from the server).
 // ---------------------------------------------------------------------------
 
@@ -101,7 +101,7 @@ const PAYMENT_METHOD_LABELS = {
 const REGULAR_AFTER_WALKS = 3;
 
 // ---------------------------------------------------------------------------
-// Storage — one small JSON blob per collection, written atomically.
+// Storage: one small JSON blob per collection, written atomically.
 //
 // Locally and on Render this is a JSON file per collection (unchanged). When
 // POSTGRES_URL/DATABASE_URL is set (Vercel + a provisioned Postgres database)
@@ -135,7 +135,7 @@ if (usingDb) {
   try {
     waitUntil = require('@vercel/functions').waitUntil;
   } catch (err) {
-    console.warn('@vercel/functions not installed — background database writes are not guaranteed to finish before the function freezes.');
+    console.warn('@vercel/functions not installed, background database writes are not guaranteed to finish before the function freezes.');
   }
 }
 
@@ -238,7 +238,7 @@ const DEFAULT_EMAIL_TEMPLATES = [
     name: 'Monthly promotion',
     subject: 'A little something for {{dogName}} this month',
     body:
-      "Hi {{ownerName}},\n\nHope {{dogName}} has been loving the walks! Just a heads up — " +
+      "Hi {{ownerName}},\n\nHope {{dogName}} has been loving the walks! Just a heads up: " +
       "if you refer a neighbour this month, you both get a $10 credit once they book their " +
       "first walk. Their referral code is your name + the last 4 digits of your phone " +
       "number: {{referralCode}}.\n\nThanks for being part of the pack!\nKaylee",
@@ -306,7 +306,7 @@ function isActive(b) {
 }
 
 // ---------------------------------------------------------------------------
-// Minimal in-memory rate limiting — protects the passcode gate from brute
+// Minimal in-memory rate limiting: protects the passcode gate from brute
 // force and the public client-lookup endpoint from phone-number enumeration.
 // Resets on server restart; that's fine for a single-operator local site.
 // ---------------------------------------------------------------------------
@@ -335,7 +335,7 @@ function safeEqual(a, b) {
 function checkPasscode(supplied, req, res) {
   if (!safeEqual(supplied || '', PASSCODE)) {
     if (!underRateLimit('passcode-fail:' + clientIp(req), 20, 15 * 60 * 1000)) {
-      res.status(429).json({ error: 'Too many attempts — please wait a few minutes and try again.' });
+      res.status(429).json({ error: 'Too many attempts, please wait a few minutes and try again.' });
       return false;
     }
     res.status(401).json({ error: 'Wrong passcode.' });
@@ -359,7 +359,7 @@ function requirePasscodeQuery(req, res, next) {
 }
 
 // ---------------------------------------------------------------------------
-// Authentication helpers — real password hashing (scrypt), server-side
+// Authentication helpers: real password hashing (scrypt), server-side
 // sessions delivered as signed-random httpOnly cookies, persisted to disk so
 // they survive restarts and work across devices. Only a SHA-256 hash of each
 // session token is stored, so a leaked sessions.json can't be used to log in.
@@ -473,7 +473,7 @@ function requireAuth(req, res, next) {
   next();
 }
 
-/** Public-safe view of an account — never exposes the password hash. */
+/** Public-safe view of an account: never exposes the password hash. */
 function safeAccount(a) {
   return {
     id: a.id,
@@ -543,7 +543,7 @@ function linkAccountToClient(account) {
 }
 
 // ---------------------------------------------------------------------------
-// Booking conflict rules — shared by the public form, Kaylee's manual add,
+// Booking conflict rules: shared by the public form, Kaylee's manual add,
 // and the Google Calendar pull-sync so every path enforces the same schedule.
 // Returns { status, error } or null when the slot works.
 // ---------------------------------------------------------------------------
@@ -566,7 +566,7 @@ function findBookingConflict({ date, slot, duration, phone, dogName, ignoreId })
   if (sameSlot.length >= MAX_DOGS_PER_WALK) {
     return {
       status: 409,
-      error: `That time is already full — three dogs is my max for one walk! Please pick another slot and I'll see you then.`,
+      error: `That time is already full, three dogs is my max for one walk! Please pick another slot and I'll see you then.`,
     };
   }
   const differentLength = sameSlot.find((b) => b.duration !== duration);
@@ -577,7 +577,7 @@ function findBookingConflict({ date, slot, duration, phone, dogName, ignoreId })
     };
   }
 
-  // A walk's actual duration can run into the next slot — block anything
+  // A walk's actual duration can run into the next slot, block anything
   // that would put Kaylee in two places at once, across walk groups.
   const newStart = slotToMinutes(slot);
   const newEnd = newStart + duration;
@@ -594,7 +594,7 @@ function findBookingConflict({ date, slot, duration, phone, dogName, ignoreId })
     if (newStart < otherEnd && otherStart < newEnd) {
       return {
         status: 409,
-        error: `That overlaps with a walk already booked at ${other.slot} (${other.duration} min) — Kaylee can't be two places at once! Please pick a time that doesn't overlap.`,
+        error: `That overlaps with a walk already booked at ${other.slot} (${other.duration} min). Kaylee can't be two places at once! Please pick a time that doesn't overlap.`,
       };
     }
   }
@@ -662,7 +662,7 @@ function bookingEventBody(b) {
   return {
     summary: (b.status === STATUS.DONE ? '✓ ' : '') + `Dog walk: ${b.dogName} (${b.duration} min)`,
     description:
-      `Owner: ${b.ownerName}\nPhone: ${b.phone}\nDog: ${b.dogName} — ${b.dogSize}` +
+      `Owner: ${b.ownerName}\nPhone: ${b.phone}\nDog: ${b.dogName}, ${b.dogSize}` +
       (b.notes ? `\nNotes: ${b.notes}` : '') +
       `\n\nBooked via Kaylee's Dog Walking Service`,
     location: b.address,
@@ -733,7 +733,7 @@ function slotForMinutes(min) {
  * Two-way pull: for every active upcoming booking, make sure a calendar
  * event exists; adopt calendar-side deletions (cancel the booking) and moves
  * (update the booking when the new time maps to a valid free slot, otherwise
- * push the app's time back to the calendar — the schedule's rules win).
+ * push the app's time back to the calendar, the schedule's rules win).
  */
 async function gcalPullSync() {
   const summary = { created: 0, cancelledFromCalendar: 0, movedFromCalendar: 0, pushedBack: 0 };
@@ -799,7 +799,7 @@ async function gcalPullSync() {
   return summary;
 }
 
-/** First name, letters only, uppercased — for referral codes. */
+/** First name, letters only, uppercased, for referral codes. */
 function firstNameSlug(name) {
   const first = String(name).trim().split(/\s+/)[0] || 'FRIEND';
   return first.replace(/[^a-zA-Z]/g, '').toUpperCase() || 'FRIEND';
@@ -1093,7 +1093,7 @@ app.use((req, res, next) => {
 
 // ---------------------------------------------------------------------------
 // Storage readiness gate. Locally/on Render this resolves once, instantly
-// (loadAllStores() has already run by the time app.listen() fires — see the
+// (loadAllStores() has already run by the time app.listen() fires, see the
 // bottom of this file). On Vercel with a Postgres backend, a cold-started
 // function instance must not serve a request before its first DB read
 // completes, so this awaits that one-time load per instance before letting
@@ -1109,8 +1109,8 @@ app.use('/api', (req, res, next) => {
 // CSRF backstop: state-changing API requests must come from this site.
 // SameSite=Lax session cookies already stop classic cross-site form posts;
 // this rejects anything whose Origin header points somewhere else entirely.
-// (Requests without an Origin header — curl, same-origin fetches in older
-// browsers — pass through; they can't ride a victim's cookies cross-site.)
+// (Requests without an Origin header, curl, same-origin fetches in older
+// browsers, pass through; they can't ride a victim's cookies cross-site.)
 // ---------------------------------------------------------------------------
 
 app.use('/api', (req, res, next) => {
@@ -1132,11 +1132,11 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
-// Broad per-IP ceiling across the whole API — generous for real use, but
+// Broad per-IP ceiling across the whole API: generous for real use, but
 // stops scripted flooding (of bookings, signups, anything) cold.
 app.use('/api', (req, res, next) => {
   if (!underRateLimit('api:' + clientIp(req), 300, 5 * 60 * 1000)) {
-    res.status(429).json({ error: 'Too many requests — please slow down and try again in a few minutes.' });
+    res.status(429).json({ error: 'Too many requests, please slow down and try again in a few minutes.' });
     return;
   }
   next();
@@ -1166,12 +1166,12 @@ app.get('/api/config', (req, res) => {
 });
 
 // Returning-client lookup so the booking form can autofill dog details.
-// Only returns booking-relevant fields — never notes, tags or credit balance.
+// Only returns booking-relevant fields, never notes, tags or credit balance.
 // Rate-limited per IP so this can't be used to enumerate other clients'
 // names and addresses by guessing phone numbers.
 app.get('/api/clients/lookup', (req, res) => {
   if (!underRateLimit('lookup:' + clientIp(req), 30, 10 * 60 * 1000)) {
-    res.status(429).json({ error: 'Too many lookups — please wait a bit and try again.' });
+    res.status(429).json({ error: 'Too many lookups, please wait a bit and try again.' });
     return;
   }
   const phone = String(req.query.phone || '');
@@ -1196,9 +1196,9 @@ app.get('/api/clients/lookup', (req, res) => {
 });
 
 app.post('/api/bookings', (req, res) => {
-  // Bookings mutate data and send notifications — cap how fast one IP can fire them.
+  // Bookings mutate data and send notifications: cap how fast one IP can fire them.
   if (!underRateLimit('book:' + clientIp(req), 8, 10 * 60 * 1000)) {
-    res.status(429).json({ error: 'Too many bookings from this connection — please wait a few minutes, or text Kaylee at 587-433-2199.' });
+    res.status(429).json({ error: 'Too many bookings from this connection, please wait a few minutes, or text Kaylee at 587-433-2199.' });
     return;
   }
   const body = req.body || {};
@@ -1238,7 +1238,7 @@ app.post('/api/bookings', (req, res) => {
 
   if (date < todayString()) {
     res.status(400).json({
-      error: 'That date has already passed — please pick today or a future date.',
+      error: 'That date has already passed, please pick today or a future date.',
     });
     return;
   }
@@ -1250,7 +1250,7 @@ app.post('/api/bookings', (req, res) => {
     return;
   }
 
-  // Duplicate, capacity, duration-mismatch, and overlap rules — shared with
+  // Duplicate, capacity, duration-mismatch, and overlap rules, shared with
   // Kaylee's manual add and the Google Calendar pull-sync.
   const conflict = findBookingConflict({ date, slot, duration, phone, dogName });
   if (conflict) {
@@ -1269,7 +1269,7 @@ app.post('/api/bookings', (req, res) => {
       (c) => c.referralCode === referralCode.toUpperCase() && c.normalizedPhone !== normalizePhone(phone)
     );
     if (!match) {
-      res.status(400).json({ error: `"${referralCode}" isn't a code I recognize — double-check it, or leave it blank.` });
+      res.status(400).json({ error: `"${referralCode}" isn't a code I recognize, double-check it, or leave it blank.` });
       return;
     }
   }
@@ -1319,7 +1319,7 @@ app.post('/api/bookings', (req, res) => {
   saveBookings();
   gcalOnBookingCreated(booking);
 
-  // Booking a walk is the clearest possible "I'm back" — unpause the account.
+  // Booking a walk is the clearest possible "I'm back": unpause the account.
   if (bookingAccount && bookingAccount.paused) {
     bookingAccount.paused = false;
     saveAccounts();
@@ -1341,7 +1341,7 @@ app.post('/api/bookings', (req, res) => {
     `Hi ${ownerName}, ${dogName}'s walk is booked for ${date} at ${slot} (${duration} min).`,
   ];
   if (joinedNeighbours) confirmationLines.push('A neighbour on your street joined the same slot, so you both get $5 off!');
-  if (referralApplied) confirmationLines.push(`Your referral code was applied — $${(referralDiscountCents / 100).toFixed(0)} off this walk.`);
+  if (referralApplied) confirmationLines.push(`Your referral code was applied: $${(referralDiscountCents / 100).toFixed(0)} off this walk.`);
   if (activePaymentMethods.length) confirmationLines.push(`Payment accepted: ${activePaymentMethods.join(', ')}.`);
   confirmationLines.push("I'll text a photo after the walk!");
 
@@ -1356,14 +1356,14 @@ app.post('/api/bookings', (req, res) => {
     bookingId: booking.id,
     type: 'reminder',
     to: phone,
-    message: `Hi ${ownerName}, just a reminder — ${dogName}'s walk with Kaylee is today at ${slot}!`,
+    message: `Hi ${ownerName}, just a reminder: ${dogName}'s walk with Kaylee is today at ${slot}!`,
     scheduledFor: reminderTimeFor(date),
   });
 
   const messageParts = [];
   messageParts.push(
     joinedNeighbours
-      ? `You're booked — and a neighbour on your street has the same slot, so you both get the group discount!`
+      ? `You're booked, and a neighbour on your street has the same slot, so you both get the group discount!`
       : `You're booked! I'll text ${phone} to confirm.`
   );
   if (referralApplied) messageParts.push(`Your referral code saved you $${(referralDiscountCents / 100).toFixed(0)}.`);
@@ -1414,7 +1414,7 @@ app.patch('/api/bookings/:id', requirePasscode, (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// CRM: client profiles (passcode-protected — this is Kaylee's private data)
+// CRM: client profiles (passcode-protected, this is Kaylee's private data)
 // ---------------------------------------------------------------------------
 
 app.get('/api/clients', requirePasscode, (req, res) => {
@@ -1465,7 +1465,7 @@ app.patch('/api/clients/:id', requirePasscode, (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// Backup export — a full dump of clients + bookings so Kaylee never loses
+// Backup export: a full dump of clients + bookings so Kaylee never loses
 // her client list even if this server/disk goes away. Passcode-protected.
 // ---------------------------------------------------------------------------
 
@@ -1496,7 +1496,7 @@ app.patch('/api/settings/payment-methods', requirePasscode, (req, res) => {
 
 // ---------------------------------------------------------------------------
 // Notification log (booking confirmations + day-of reminders).
-// NOTE: nothing here actually sends an SMS or email yet — see the
+// NOTE: nothing here actually sends an SMS or email yet, see the
 // "notConnected" flag returned below. Wiring in a real provider (e.g.
 // Twilio for SMS, or SendGrid/Postmark/Resend for email) means calling
 // their API at the point queueNotification()/POST /api/emails/send is
@@ -1506,14 +1506,14 @@ app.patch('/api/settings/payment-methods', requirePasscode, (req, res) => {
 app.get('/api/notifications', requirePasscode, (req, res) => {
   res.json({
     notConnected: true,
-    notice: 'No SMS provider is wired in yet (e.g. Twilio) — these messages are logged but not actually delivered.',
+    notice: 'No SMS provider is wired in yet (e.g. Twilio). These messages are logged but not actually delivered.',
     notifications: notifications.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
   });
 });
 
 // ---------------------------------------------------------------------------
 // Email templates + one-off/bulk send log.
-// NOTE: same caveat as above — no email provider is connected. "Sending"
+// NOTE: same caveat as above, no email provider is connected. "Sending"
 // here writes a log entry so the interface and data model are ready; wire
 // a real provider into POST /api/emails/send to actually deliver mail.
 // ---------------------------------------------------------------------------
@@ -1539,7 +1539,7 @@ app.patch('/api/email-templates/:id', requirePasscode, (req, res) => {
 app.get('/api/email-log', requirePasscode, (req, res) => {
   res.json({
     notConnected: true,
-    notice: 'No email provider is wired in yet (e.g. SendGrid, Postmark, Resend) — sends below are logged, not delivered.',
+    notice: 'No email provider is wired in yet (e.g. SendGrid, Postmark, Resend). Sends below are logged, not delivered.',
     log: emailLog.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
   });
 });
@@ -1579,7 +1579,7 @@ app.post('/api/emails/send', requirePasscode, (req, res) => {
       to: client.email ? `${client.ownerName} <${client.email}>` : `${client.ownerName} (no email on file)`,
       subject,
       body: text,
-      status: 'queued — not sent (no email provider connected)',
+      status: 'queued: not sent (no email provider connected)',
       createdAt: new Date().toISOString(),
     };
     emailLog.push(entry);
@@ -1591,12 +1591,12 @@ app.post('/api/emails/send', requirePasscode, (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// Client accounts — signup / login / logout / me
+// Client accounts: signup / login / logout / me
 // ---------------------------------------------------------------------------
 
 app.post('/api/auth/signup', (req, res) => {
   if (!underRateLimit('signup:' + clientIp(req), 10, 15 * 60 * 1000)) {
-    res.status(429).json({ error: 'Too many attempts — please wait a few minutes and try again.' });
+    res.status(429).json({ error: 'Too many attempts, please wait a few minutes and try again.' });
     return;
   }
   const body = req.body || {};
@@ -1618,7 +1618,7 @@ app.post('/api/auth/signup', (req, res) => {
     return;
   }
   if (accounts.some((a) => a.email === email)) {
-    res.status(409).json({ error: 'An account with that email already exists — try logging in instead.' });
+    res.status(409).json({ error: 'An account with that email already exists, try logging in instead.' });
     return;
   }
 
@@ -1645,7 +1645,7 @@ app.post('/api/auth/signup', (req, res) => {
 
 app.post('/api/auth/login', (req, res) => {
   if (!underRateLimit('login:' + clientIp(req), 15, 15 * 60 * 1000)) {
-    res.status(429).json({ error: 'Too many attempts — please wait a few minutes and try again.' });
+    res.status(429).json({ error: 'Too many attempts, please wait a few minutes and try again.' });
     return;
   }
   const body = req.body || {};
@@ -1655,7 +1655,7 @@ app.post('/api/auth/login', (req, res) => {
   // Per-account limit on top of the per-IP one, so a distributed guesser
   // can't hammer a single mailbox from many addresses.
   if (email && !underRateLimit('login-email:' + email, 10, 15 * 60 * 1000)) {
-    res.status(429).json({ error: 'Too many attempts — please wait a few minutes and try again.' });
+    res.status(429).json({ error: 'Too many attempts, please wait a few minutes and try again.' });
     return;
   }
 
@@ -1688,7 +1688,7 @@ app.get('/api/auth/me', (req, res) => {
 
 // ---------------------------------------------------------------------------
 // Google OAuth (authorization-code flow). Inactive until GOOGLE_CLIENT_ID /
-// GOOGLE_CLIENT_SECRET / BASE_URL are configured — see the notes at the top.
+// GOOGLE_CLIENT_SECRET / BASE_URL are configured, see the notes at the top.
 // ---------------------------------------------------------------------------
 
 app.get('/api/auth/google', (req, res) => {
@@ -1886,7 +1886,7 @@ app.get('/api/account/bookings', requireAuth, (req, res) => {
   const key = normalizePhone(account.phone);
   // Match this account's own bookings by accountId. Fall back to phone ONLY
   // for bookings that aren't already tied to any account (i.e. legacy walks
-  // booked before this person had an account) — so setting your phone to a
+  // booked before this person had an account), so setting your phone to a
   // stranger's number can never surface bookings that belong to their account.
   const mine = bookings.filter(
     (b) => b.accountId === account.id || (!b.accountId && key && b.normalizedPhone === key)
@@ -1915,7 +1915,7 @@ app.get('/api/account/bookings', requireAuth, (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// Google Calendar connection (Kaylee only — passcode protected).
+// Google Calendar connection (Kaylee only, passcode protected).
 // Needs the same Google Cloud OAuth client as sign-in, with the extra
 // redirect URI <BASE_URL>/api/gcal/callback authorized and the Calendar API
 // enabled on the project. Until GOOGLE_CLIENT_ID/SECRET are set these
@@ -1934,7 +1934,7 @@ app.get('/api/gcal/status', requirePasscode, (req, res) => {
 
 app.get('/api/gcal/connect', requirePasscodeQuery, (req, res) => {
   if (!googleEnabled()) {
-    res.status(503).json({ error: 'Google credentials are not configured yet — see the README.' });
+    res.status(503).json({ error: 'Google credentials are not configured yet, see the README.' });
     return;
   }
   const state = crypto.randomBytes(16).toString('hex');
@@ -2026,14 +2026,14 @@ app.post('/api/gcal/sync', requirePasscode, async (req, res) => {
 
 // ---------------------------------------------------------------------------
 // Password reset. No email provider is connected yet, so the reset link is
-// queued into the email log — Kaylee can open Messages and text the link to
+// queued into the email log, Kaylee can open Messages and text the link to
 // the client. Once a provider is wired into the email queue, this flow
 // delivers automatically with no further changes.
 // ---------------------------------------------------------------------------
 
 app.post('/api/auth/forgot', (req, res) => {
   if (!underRateLimit('forgot:' + clientIp(req), 5, 15 * 60 * 1000)) {
-    res.status(429).json({ error: 'Too many attempts — please wait a few minutes and try again.' });
+    res.status(429).json({ error: 'Too many attempts, please wait a few minutes and try again.' });
     return;
   }
   const email = normalizeEmail((req.body || {}).email);
@@ -2063,8 +2063,8 @@ app.post('/api/auth/forgot', (req, res) => {
     body:
       `Hi ${account.name || 'there'},\n\nSomeone asked to reset the password for this account. ` +
       `If that was you, open this link within 1 hour:\n\n${link}\n\n` +
-      `If it wasn't you, you can ignore this — your password is unchanged.`,
-    status: 'queued — not sent (no email provider connected)',
+      `If it wasn't you, you can ignore this, your password is unchanged.`,
+    status: 'queued: not sent (no email provider connected)',
     createdAt: new Date().toISOString(),
   });
   saveEmailLog();
@@ -2081,7 +2081,7 @@ app.post('/api/auth/forgot', (req, res) => {
 
 app.post('/api/auth/reset', (req, res) => {
   if (!underRateLimit('reset:' + clientIp(req), 10, 15 * 60 * 1000)) {
-    res.status(429).json({ error: 'Too many attempts — please wait a few minutes and try again.' });
+    res.status(429).json({ error: 'Too many attempts, please wait a few minutes and try again.' });
     return;
   }
   const body = req.body || {};
@@ -2096,7 +2096,7 @@ app.post('/api/auth/reset', (req, res) => {
     (a) => a.resetTokenHash === th && a.resetTokenExpiry && a.resetTokenExpiry > Date.now()
   );
   if (!account) {
-    res.status(400).json({ error: 'That reset link is invalid or has expired — request a new one.' });
+    res.status(400).json({ error: 'That reset link is invalid or has expired, request a new one.' });
     return;
   }
   account.passwordHash = hashPassword(newPassword);
@@ -2105,7 +2105,7 @@ app.post('/api/auth/reset', (req, res) => {
   account.updatedAt = new Date().toISOString();
   saveAccounts();
 
-  // A reset means the old password may be compromised — sign out everywhere,
+  // A reset means the old password may be compromised, sign out everywhere,
   // then start a fresh session for this browser.
   sessions = sessions.filter((s) => s.accountId !== account.id);
   saveSessions();
@@ -2115,7 +2115,7 @@ app.post('/api/auth/reset', (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// Admin manual add (Kaylee only) — for phone and in-person bookings that
+// Admin manual add (Kaylee only): for phone and in-person bookings that
 // never touch the public form, and for adding a client directly.
 // ---------------------------------------------------------------------------
 
@@ -2170,7 +2170,7 @@ app.post('/api/admin/bookings', requirePasscode, (req, res) => {
     duration,
     notes,
     dogBirthday: '',
-    // Recorded by Kaylee, not the client — the waiver wasn't checked online.
+    // Recorded by Kaylee, not the client. The waiver wasn't checked online.
     vaccinatedAgreed: false,
     waiverAgreed: false,
     waiverAgreedAt: null,
@@ -2190,18 +2190,18 @@ app.post('/api/admin/bookings', requirePasscode, (req, res) => {
     bookingId: booking.id,
     type: 'confirmation',
     to: phone,
-    message: `Hi ${ownerName}, ${dogName}'s walk is booked for ${date} at ${slot} (${duration} min). — Kaylee`,
+    message: `Hi ${ownerName}, ${dogName}'s walk is booked for ${date} at ${slot} (${duration} min). - Kaylee`,
     scheduledFor: booking.createdAt,
   });
   queueNotification({
     bookingId: booking.id,
     type: 'reminder',
     to: phone,
-    message: `Hi ${ownerName}, just a reminder — ${dogName}'s walk with Kaylee is today at ${slot}!`,
+    message: `Hi ${ownerName}, just a reminder: ${dogName}'s walk with Kaylee is today at ${slot}!`,
     scheduledFor: reminderTimeFor(date),
   });
 
-  res.status(201).json({ ok: true, id: booking.id, note: 'Remember to cover the waiver with them in person — this booking is marked as manually added.' });
+  res.status(201).json({ ok: true, id: booking.id, note: 'Remember to cover the waiver with them in person, this booking is marked as manually added.' });
 });
 
 app.post('/api/admin/clients', requirePasscode, (req, res) => {
@@ -2241,7 +2241,7 @@ app.post('/api/admin/clients', requirePasscode, (req, res) => {
 
 // ---------------------------------------------------------------------------
 // Pause / resume account (client). Paused clients stay in the CRM with all
-// their history — they're just flagged so Kaylee knows they're away.
+// their history, they're just flagged so Kaylee knows they're away.
 // ---------------------------------------------------------------------------
 
 app.post('/api/account/pause', requireAuth, (req, res) => {
@@ -2281,7 +2281,7 @@ app.use((err, req, res, next) => {
   const status = err.status || err.statusCode || 500;
   if (status >= 500) console.error('Unhandled error:', err.message);
   res.status(status).json({
-    error: status === 400 ? 'That request could not be read — please try again.' : 'Something went wrong — please try again.',
+    error: status === 400 ? 'That request could not be read, please try again.' : 'Something went wrong, please try again.',
   });
 });
 
@@ -2310,17 +2310,17 @@ async function loadAllStores() {
 
 // Load once per warm instance (file-backed: once ever, at boot; DB-backed:
 // once per cold start), then serve every request after that straight out of
-// memory — exactly like the original file-based code always did. Reloading
+// memory, exactly like the original file-based code always did. Reloading
 // on every single request instead was tried and reverted: save() doesn't
 // wait for the database write to land before the response goes out (that's
-// the whole point of waitUntil — it keeps the write going in the background
+// the whole point of waitUntil, it keeps the write going in the background
 // without delaying the response), so an immediate next request could reload
 // a split second before its own previous write had actually committed and
 // see stale data. Caching per-instance avoids that race entirely for
 // same-instance traffic. The tradeoff: a write from one concurrent Vercel
 // instance isn't visible to a *different* instance until that instance's own
 // next cold start. For this app's traffic (a single dog walker's booking
-// site), that's an acceptable, honest limitation — see README.
+// site), that's an acceptable, honest limitation, see README.
 let readyPromise = null;
 function ensureReady() {
   if (!readyPromise) readyPromise = loadAllStores();
@@ -2330,7 +2330,7 @@ function ensureReady() {
 module.exports = app;
 
 // Vercel imports `app` (via api/index.js) and calls it as a request handler
-// directly — it never runs this file as a standalone process, so app.listen()
+// directly, it never runs this file as a standalone process, so app.listen()
 // must not run there. Locally and on Render, this is what actually starts
 // the server.
 if (!process.env.VERCEL) {

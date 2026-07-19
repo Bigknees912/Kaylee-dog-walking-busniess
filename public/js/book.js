@@ -70,7 +70,7 @@
       fillSelect(durationSelect, config.durations, (d) => {
         const opt = document.createElement('option');
         opt.value = String(d.minutes);
-        opt.textContent = d.minutes + ' minutes — ' + dollars(d.priceCents);
+        opt.textContent = d.minutes + ' minutes · ' + dollars(d.priceCents);
         return opt;
       });
 
@@ -99,7 +99,7 @@
       }
       var acct = data.account;
       var banner = document.getElementById('loggedin-banner');
-      banner.textContent = 'Booking as ' + (acct.name || acct.email) + '. Your info is filled in below — change anything you like.';
+      banner.textContent = 'Booking as ' + (acct.name || acct.email) + '. Your info is filled in below, change anything you like.';
       banner.hidden = false;
 
       if (!form.ownerName.value.trim()) form.ownerName.value = acct.name || '';
@@ -204,7 +204,7 @@
           returningHint.hidden = true;
           lastLookedUp = '';
         } else {
-          showMessage(body.error || 'Something went wrong — please try again.', false);
+          showMessage(body.error || 'Something went wrong, please try again.', false);
         }
       })
       .catch(() => {

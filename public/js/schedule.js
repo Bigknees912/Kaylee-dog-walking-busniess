@@ -93,7 +93,7 @@
         loadSchedule();
       })
       .catch(() => {
-        window.alert('Could not reach the server — try refreshing.');
+        window.alert('Could not reach the server, try refreshing.');
         button.disabled = false;
       });
   }
@@ -169,7 +169,7 @@
   function renderWalks(walks) {
     walksHolder.innerHTML = '';
     if (walks.length === 0) {
-      const empty = el('p', 'hand', 'No walks booked yet — share the site with the neighbours!');
+      const empty = el('p', 'hand', 'No walks booked yet, share the site with the neighbours!');
       empty.style.fontSize = '1.35rem';
       walksHolder.appendChild(empty);
       return;
@@ -192,7 +192,7 @@
         if (status === 401) {
           sessionStorage.removeItem('kaylee-passcode');
           passcode = '';
-          showGate('That passcode is not right — try again.');
+          showGate('That passcode is not right, try again.');
           return;
         }
         if (!ok) {
@@ -221,7 +221,7 @@
           }
         }
       })
-      .catch(() => showGate('Could not reach the server — is it running?'));
+      .catch(() => showGate('Could not reach the server, is it running?'));
   }
 
   // ----- tabs -----
@@ -304,7 +304,7 @@
 
       const walksToday = (byDate.get(iso) || []).slice().sort((a, b) => slotIndexOf(a.slot) - slotIndexOf(b.slot));
       if (walksToday.length === 0) {
-        cell.appendChild(el('div', 'dog-sub', '—'));
+        cell.appendChild(el('div', 'dog-sub', '-'));
       }
       for (const w of walksToday) {
         const label = w.slot + ' · ' + w.dogs.length + (w.dogs.length === 1 ? ' dog' : ' dogs');
@@ -349,7 +349,7 @@
       })
       .catch(() => {
         holder.innerHTML = '';
-        holder.appendChild(el('p', 'hint', 'Could not reach the server — try refreshing.'));
+        holder.appendChild(el('p', 'hint', 'Could not reach the server, try refreshing.'));
       });
   }
 
@@ -361,12 +361,12 @@
     })
       .then(({ ok }) => {
         if (!ok) {
-          window.alert('Could not update tags — please try again.');
+          window.alert('Could not update tags, please try again.');
           return;
         }
         loadClients();
       })
-      .catch(() => window.alert('Could not reach the server — try refreshing.'));
+      .catch(() => window.alert('Could not reach the server, try refreshing.'));
   }
 
   function renderClientCard(c) {
@@ -387,7 +387,7 @@
       card.appendChild(el('div', 'client-credit', '$' + (c.pendingCreditCents / 100).toFixed(0) + ' referral credit owed'));
     }
     if (c.paused) {
-      card.appendChild(el('div', 'client-credit', '⏸ Account paused — away for now'));
+      card.appendChild(el('div', 'client-credit', '⏸ Account paused, away for now'));
     }
 
     const tagRow = el('div', 'tag-row');
@@ -433,11 +433,11 @@
         body: JSON.stringify({ notes: notesArea.value }),
       })
         .then(({ ok }) => {
-          saveBtn.textContent = ok ? 'Saved ✓' : 'Failed — retry';
+          saveBtn.textContent = ok ? 'Saved ✓' : 'Failed, retry';
           setTimeout(() => (saveBtn.textContent = 'Save notes'), 1500);
         })
         .catch(() => {
-          saveBtn.textContent = 'Failed — retry';
+          saveBtn.textContent = 'Failed, retry';
           setTimeout(() => (saveBtn.textContent = 'Save notes'), 1500);
         })
         .finally(() => {
@@ -468,7 +468,7 @@
   const paymentSubs = {
     etransfer: 'Standard for most bookings',
     cash: 'Paid directly at the walk',
-    stripe: 'Placeholder — needs a real Stripe account connected before this can actually charge cards',
+    stripe: 'Placeholder, needs a real Stripe account connected before this can actually charge cards',
   };
 
   function loadPaymentSettings() {
@@ -484,7 +484,7 @@
       })
       .catch(() => {
         holder.innerHTML = '';
-        holder.appendChild(el('p', 'hint', 'Could not reach the server — try refreshing.'));
+        holder.appendChild(el('p', 'hint', 'Could not reach the server, try refreshing.'));
       });
   }
 
@@ -515,12 +515,12 @@
           .then(({ ok }) => {
             if (!ok) {
               input.checked = !desired; // revert on failure so the UI matches reality
-              window.alert('Could not save that — please try again.');
+              window.alert('Could not save that, please try again.');
             }
           })
           .catch(() => {
             input.checked = !desired;
-            window.alert('Could not reach the server — try again.');
+            window.alert('Could not reach the server, try again.');
           })
           .finally(() => {
             input.disabled = false;
@@ -545,7 +545,7 @@
       const item = el('div', 'notif-entry');
       const meta = el('div', 'notif-meta');
       meta.appendChild(el('span', null, metaFn(entry)));
-      meta.appendChild(el('span', 'notif-status', entry.status.split(' —')[0]));
+      meta.appendChild(el('span', 'notif-status', entry.status.split(':')[0]));
       item.appendChild(meta);
       item.appendChild(el('div', null, bodyFn(entry)));
       holder.appendChild(item);
@@ -571,7 +571,7 @@
       })
       .catch(() => {
         holder.innerHTML = '';
-        holder.appendChild(el('p', 'hint', 'Could not reach the server — try refreshing.'));
+        holder.appendChild(el('p', 'hint', 'Could not reach the server, try refreshing.'));
       });
   }
 
@@ -594,7 +594,7 @@
       })
       .catch(() => {
         holder.innerHTML = '';
-        holder.appendChild(el('p', 'hint', 'Could not reach the server — try refreshing.'));
+        holder.appendChild(el('p', 'hint', 'Could not reach the server, try refreshing.'));
       });
   }
 
@@ -620,11 +620,11 @@
           body: JSON.stringify({ subject: subjInput.value, body: bodyArea.value }),
         })
           .then(({ ok }) => {
-            saveBtn.textContent = ok ? 'Saved ✓' : 'Failed — retry';
+            saveBtn.textContent = ok ? 'Saved ✓' : 'Failed, retry';
             setTimeout(() => (saveBtn.textContent = 'Save template'), 1500);
           })
           .catch(() => {
-            saveBtn.textContent = 'Failed — retry';
+            saveBtn.textContent = 'Failed, retry';
             setTimeout(() => (saveBtn.textContent = 'Save template'), 1500);
           })
           .finally(() => {
@@ -654,7 +654,7 @@
         document.getElementById('email-templates').innerHTML = '';
         document
           .getElementById('email-templates')
-          .appendChild(el('p', 'hint', 'Could not load templates — try refreshing.'));
+          .appendChild(el('p', 'hint', 'Could not load templates, try refreshing.'));
       });
   }
 
@@ -681,14 +681,14 @@
           cb.style.margin = '0';
           label.appendChild(cb);
           label.appendChild(
-            document.createTextNode(c.ownerName + ' (' + c.dogName + ')' + (c.paused ? ' — paused' : ''))
+            document.createTextNode(c.ownerName + ' (' + c.dogName + ')' + (c.paused ? ', paused' : ''))
           );
           holder.appendChild(label);
         });
       })
       .catch(() => {
         holder.innerHTML = '';
-        holder.appendChild(el('p', 'hint', 'Could not reach the server — try refreshing.'));
+        holder.appendChild(el('p', 'hint', 'Could not reach the server, try refreshing.'));
       });
   }
 
@@ -719,14 +719,14 @@
       })
         .then(({ ok, body }) => {
           msgEl.textContent = ok
-            ? 'Queued ' + body.queued + ' email(s) — not actually sent yet (no email provider connected).'
+            ? 'Queued ' + body.queued + ' email(s), not actually sent yet (no email provider connected).'
             : body.error || 'Something went wrong.';
           msgEl.className = 'form-msg ' + (ok ? 'ok' : 'err');
           msgEl.hidden = false;
           if (ok) loadEmailLog();
         })
         .catch(() => {
-          msgEl.textContent = 'Could not reach the server — please try again.';
+          msgEl.textContent = 'Could not reach the server, please try again.';
           msgEl.className = 'form-msg err';
           msgEl.hidden = false;
         })
@@ -771,7 +771,7 @@
       (d) => {
         const o = document.createElement('option');
         o.value = String(d.minutes);
-        o.textContent = d.minutes + ' minutes — ' + dollars(d.priceCents);
+        o.textContent = d.minutes + ' minutes · ' + dollars(d.priceCents);
         return o;
       }
     );
@@ -814,7 +814,7 @@
           }
         })
         .catch(() => {
-          msgEl.textContent = 'Could not reach the server — please try again.';
+          msgEl.textContent = 'Could not reach the server, please try again.';
           msgEl.className = 'form-msg err';
           msgEl.hidden = false;
         })
@@ -856,7 +856,7 @@
           }
         })
         .catch(() => {
-          msgEl.textContent = 'Could not reach the server — please try again.';
+          msgEl.textContent = 'Could not reach the server, please try again.';
           msgEl.className = 'form-msg err';
           msgEl.hidden = false;
         })
@@ -885,7 +885,7 @@
         gcalDisconnectBtn.hidden = true;
         if (!body.configured) {
           gcalStatusText.textContent =
-            'Not configured yet: this needs Google Cloud credentials (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET) with the Calendar API enabled — see the README. Nothing here is faked: once the credentials are set, Connect appears and every booking syncs to your real calendar.';
+            'Not configured yet: this needs Google Cloud credentials (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET) with the Calendar API enabled, see the README. Nothing here is faked: once the credentials are set, Connect appears and every booking syncs to your real calendar.';
           return;
         }
         if (!body.connected) {
@@ -917,7 +917,7 @@
           if (ok) {
             const s = body.summary || {};
             gcalMsg.textContent =
-              'Synced — ' + (s.created || 0) + ' event(s) created, ' +
+              'Synced: ' + (s.created || 0) + ' event(s) created, ' +
               (s.movedFromCalendar || 0) + ' walk(s) moved from calendar, ' +
               (s.cancelledFromCalendar || 0) + ' cancelled from calendar, ' +
               (s.pushedBack || 0) + ' pushed back to calendar.';
@@ -957,8 +957,8 @@
     history.replaceState(null, '', '/schedule.html');
     const messages = {
       connected: 'Google Calendar connected! Your upcoming walks are syncing now.',
-      failed: 'Google Calendar connection failed — please try again.',
-      state_error: 'Google Calendar connection could not be verified — please try again.',
+      failed: 'Google Calendar connection failed, please try again.',
+      state_error: 'Google Calendar connection could not be verified, please try again.',
       unavailable: 'Google Calendar is not configured on the server yet.',
     };
     window.__gcalFlash = messages[flag] || null;
@@ -993,7 +993,7 @@
           a.remove();
           URL.revokeObjectURL(url);
         })
-        .catch(() => window.alert('Could not download the backup — please try again.'))
+        .catch(() => window.alert('Could not download the backup, please try again.'))
         .finally(() => {
           backupBtn.disabled = false;
           backupBtn.textContent = 'Download backup';

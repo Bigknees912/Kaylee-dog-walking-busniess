@@ -41,12 +41,12 @@
     var errKey = params.get('error');
     if (errKey) {
       var messages = {
-        google_unavailable: "Google sign-in isn't set up yet — please use email and password.",
-        google_state: 'Google sign-in could not be verified — please try again.',
-        google_failed: 'Google sign-in failed — please try again or use email and password.',
+        google_unavailable: "Google sign-in isn't set up yet, please use email and password.",
+        google_state: 'Google sign-in could not be verified, please try again.',
+        google_failed: 'Google sign-in failed, please try again or use email and password.',
       };
       // Message shown once the auth view is visible.
-      window.__googleError = messages[errKey] || 'Sign-in failed — please try again.';
+      window.__googleError = messages[errKey] || 'Sign-in failed, please try again.';
       history.replaceState(null, '', '/account.html');
     }
 
@@ -68,7 +68,7 @@
       return;
     }
 
-    // Deep link from the profile menu (?tab=signup) — logged-out only;
+    // Deep link from the profile menu (?tab=signup), logged-out only.
     // enterAccount() handles the logged-in equivalents (bookings/dogs/settings).
     if (params.get('tab') === 'signup') {
       var signupTab = document.querySelector('[data-authtab="signup"]');
@@ -133,7 +133,7 @@
       body: JSON.stringify({ email: document.getElementById('forgot-email').value.trim() }),
     }).then(function (r) {
       if (r.ok) {
-        // The account may or may not exist — the server's wording stays
+        // The account may or may not exist. The server's wording stays
         // generic on purpose so this can't be used to discover emails.
         // Add the practical next step separately, since there's no email
         // provider connected yet: Kaylee sees the link in her dashboard.
@@ -141,15 +141,15 @@
         setMsg(
           authMsg,
           (r.body.message || 'If that email has an account, a reset link is on its way.') +
-            ' Text or call Kaylee at 587-433-2199 and ask her to send you the link from her dashboard — ' +
+            ' Text or call Kaylee at 587-433-2199 and ask her to send you the link from her dashboard, ' +
             "she'll see it under Messages the moment you submit this.",
           true
         );
       } else {
-        setMsg(authMsg, r.body.error || 'Could not send a reset link — please try again.', false);
+        setMsg(authMsg, r.body.error || 'Could not send a reset link, please try again.', false);
       }
     }).catch(function () {
-      setMsg(authMsg, 'Could not reach the server — please try again.', false);
+      setMsg(authMsg, 'Could not reach the server, please try again.', false);
     }).finally(function () { btn.disabled = false; });
   });
 
@@ -172,7 +172,7 @@
         setMsg(authMsg, r.body.error || 'Could not reset your password.', false);
       }
     }).catch(function () {
-      setMsg(authMsg, 'Could not reach the server — please try again.', false);
+      setMsg(authMsg, 'Could not reach the server, please try again.', false);
     }).finally(function () { btn.disabled = false; });
   });
 
@@ -190,7 +190,7 @@
       if (r.ok) { account = r.body.account; enterAccount(); }
       else setMsg(authMsg, r.body.error || 'Could not log in.', false);
     }).catch(function () {
-      setMsg(authMsg, 'Could not reach the server — please try again.', false);
+      setMsg(authMsg, 'Could not reach the server, please try again.', false);
     }).finally(function () { btn.disabled = false; });
   });
 
@@ -210,7 +210,7 @@
       if (r.ok) { account = r.body.account; enterAccount(); }
       else setMsg(authMsg, r.body.error || 'Could not create your account.', false);
     }).catch(function () {
-      setMsg(authMsg, 'Could not reach the server — please try again.', false);
+      setMsg(authMsg, 'Could not reach the server, please try again.', false);
     }).finally(function () { btn.disabled = false; });
   });
 
@@ -339,8 +339,8 @@
   function renderPauseState() {
     pauseBtn.textContent = account.paused ? 'Resume my account' : 'Pause my account';
     document.getElementById('pause-note').textContent = account.paused
-      ? "Your account is paused — Kaylee knows you're away. All your dogs and history are safe. Resume any time, or just book a walk."
-      : "Pausing keeps all your dogs and walk history — you just won't show as an active client until you're back. Booking a walk automatically un-pauses you.";
+      ? "Your account is paused. Kaylee knows you're away. All your dogs and history are safe. Resume any time, or just book a walk."
+      : "Pausing keeps all your dogs and walk history. You just won't show as an active client until you're back. Booking a walk automatically un-pauses you.";
   }
 
   pauseBtn.addEventListener('click', function () {
@@ -353,7 +353,7 @@
       if (r.ok) {
         account = r.body.account;
         renderPauseState();
-        setMsg(msg, account.paused ? 'Account paused — enjoy the trip!' : 'Welcome back! Your account is active again.', true);
+        setMsg(msg, account.paused ? 'Account paused, enjoy the trip!' : 'Welcome back! Your account is active again.', true);
       } else {
         setMsg(msg, r.body.error || 'Could not update your account.', false);
       }
@@ -496,7 +496,7 @@
       holder.innerHTML = '';
       if (!r.ok) { holder.appendChild(el('p', 'hint', 'Could not load your dogs.')); return; }
       if (r.body.dogs.length === 0) {
-        holder.appendChild(el('p', 'hint', "No dogs yet — add your first one below and it'll autofill at booking."));
+        holder.appendChild(el('p', 'hint', "No dogs yet, add your first one below and it'll autofill at booking."));
       }
       r.body.dogs.forEach(function (d) { holder.appendChild(buildDogCard(d)); });
     }).catch(function () {
@@ -542,7 +542,7 @@
   function loadBookings() {
     j('/api/account/bookings').then(function (r) {
       if (!r.ok) return;
-      renderBookingList(document.getElementById('upcoming-bookings'), r.body.upcoming, 'No upcoming walks — book one!');
+      renderBookingList(document.getElementById('upcoming-bookings'), r.body.upcoming, 'No upcoming walks, book one!');
       renderBookingList(document.getElementById('past-bookings'), r.body.past, 'No past walks yet.');
     }).catch(function () {});
   }

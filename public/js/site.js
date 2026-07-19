@@ -235,7 +235,7 @@
 
   var note = document.createElement('p');
   note.className = 'lb-note';
-  note.textContent = "can't wait to meet the real crew — your pup's photo could be here!";
+  note.textContent = "can't wait to meet the real crew, your pup's photo could be here!";
 
   inner.appendChild(closeBtn);
   inner.appendChild(artHolder);
