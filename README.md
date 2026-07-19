@@ -228,3 +228,53 @@ To test the Postgres-backed path locally before deploying, run:
 ```
 DATABASE_URL=postgresql://user:pass@host/db KAYLEE_PASSCODE=yourpasscode npm start
 ```
+
+## SEO: getting found when someone searches "Kaylee dog walking service"
+
+The site already ships with everything a search engine needs on the code
+side: a `sitemap.xml` and `robots.txt` in `public/`, a canonical URL and
+Open Graph/Twitter preview tags on every public page, and `LocalBusiness`
+structured data on the homepage so Google understands this is a real local
+business, not just a generic page.
+
+**Before any of this can work, the site has to be live at its real address.**
+If you're still on a placeholder domain (`kaylees-dog-walking.vercel.app` is
+what's currently baked into these files), swap it for your actual final URL
+first:
+
+```
+grep -rl "kaylees-dog-walking.vercel.app" public/ | xargs sed -i 's/kaylees-dog-walking\.vercel\.app/your-real-domain.com/g'
+```
+
+Then there are two separate Google registrations to do yourself. Neither can
+be done by an assistant. They both need your own Google account:
+
+1. **Google Search Console** (controls whether Google indexes the site at
+   all): go to [search.google.com/search-console](https://search.google.com/search-console),
+   add your site as a property, verify ownership (the easiest method is the
+   HTML meta tag option, or DNS if you own a custom domain), then submit
+   `https://your-domain.com/sitemap.xml` under **Sitemaps**. After that,
+   indexing usually takes a few days to a couple of weeks for a brand-new
+   site. You can also use the **URL Inspection** tool there to request
+   indexing of the homepage directly, which speeds it up.
+
+2. **Google Business Profile** (this is the one that actually matters most
+   for "Kaylee dog walking service" showing up, and for local map/"near me"
+   results): go to [business.google.com](https://business.google.com), create
+   a profile for the business, category "Dog Walker", set the service area to
+   McKenzie Towne / Calgary (not a public address, since this is a mobile
+   service run from home), add the phone number and website URL, and verify
+   it (usually a postcard by mail, sometimes phone/email for service-area
+   businesses). Once verified and live, this is what makes the business show
+   up in Google's local map pack and in "near me" searches, which matters far
+   more than plain web search ranking for a single-neighbourhood service like
+   this one.
+
+Realistic expectations: a brand-new site with no other sites linking to it
+and no reviews yet won't rank for a generic term like "dog walker Calgary,"
+but it will show up reliably for the exact business name search you
+mentioned ("Kaylee dog walking service") within days of being indexed, and
+Business Profile visibility in the map pack can happen even faster once
+verified. Getting a few real Google reviews after the first walks (there's
+already a review-request habit built into the confirmation flow via the
+existing reviews page) is what moves the needle after that.

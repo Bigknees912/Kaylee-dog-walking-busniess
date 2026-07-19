@@ -1068,7 +1068,10 @@ app.disable('x-powered-by'); // don't advertise the framework
 
 const CSP = [
   "default-src 'self'",
-  "script-src 'self' 'sha256-/x7W7R75k8Roq0WaVRQX9blP4OufE5xbAdzklGxsgpw='",
+  // Second hash is the LocalBusiness JSON-LD block on index.html; if that
+  // block's content ever changes, recompute this hash or it'll be silently
+  // blocked (see README's SEO section for the exact command).
+  "script-src 'self' 'sha256-/x7W7R75k8Roq0WaVRQX9blP4OufE5xbAdzklGxsgpw=' 'sha256-/IoN5UhBLixTvCmYXYfyIPfo26ehQdFRyO+YzaVtlsM='",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   'font-src https://fonts.gstatic.com',
   "img-src 'self' data:",

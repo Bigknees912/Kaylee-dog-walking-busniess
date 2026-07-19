@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /account.html
+Disallow: /schedule.html
+Disallow: /api/
+
+Sitemap: https://kaylees-dog-walking.vercel.app/sitemap.xml
