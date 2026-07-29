@@ -20,12 +20,13 @@
   <script>document.documentElement.classList.add('js');</script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;700;800&family=Outfit:wght@400;500;600;700&family=Nothing+You+Could+Do&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,600&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
 
   <header class="site-header">
+    <div class="scroll-progress"><div class="scroll-progress-bar" id="scroll-bar"></div></div>
     <div class="wrap">
       <a class="brand" href="/">
         <img src="/img/paw.svg" alt="Kaylee's Dog Walking Service paw print logo">
@@ -33,8 +34,9 @@
       </a>
       <nav class="site-nav dropdown-panel" id="site-nav" hidden>
         <a href="/">Home</a>
-        <a href="/about.html">About</a>
-        <a href="/services.html">Services</a>
+        <a href="/walks.html">Where we walk</a>
+        <a href="/prices.html">Prices</a>
+        <a href="/about.html">About Kaylee</a>
         <a href="/reviews.html">Reviews</a>
         <a href="/book.html" class="nav-cta-mobile">Book a walk</a>
       </nav>
@@ -53,12 +55,12 @@
     </div>
   </header>
 
-  <main>
-    <section class="section">
-      <div class="wrap" style="max-width:760px;">
-        <p class="section-kicker">let's do this</p>
-        <h1 class="reveal-words">Book a walk</h1>
-        <p class="sub" style="font-size:1.12rem;">Tell me about your pup and pick a time. If a neighbour on your street books the same slot, you'll both get $5 off automatically. Questions? Text me at <a href="tel:+15874332199">587-433-2199</a>.</p>
+  <main style="background:linear-gradient(180deg,#E8F3FA,var(--mist) 420px);">
+    <section class="section-tight">
+      <div class="wrap" style="max-width:800px;">
+        <p class="eyebrow reveal">Book a walk</p>
+        <h1 class="reveal-words">Tell me about your dog.</h1>
+        <p class="sub reveal" style="font-size:1.1rem; --d:0.1s;">A minute of typing, then I'll text you to confirm. If a neighbour on your street books the same slot, you'll both get $5 off automatically. Questions first? Text <a href="tel:+15874332199">587-433-2199</a>.</p>
 
         <div id="loggedin-banner" class="notice" style="margin-top:16px;" hidden></div>
         <p id="loggedout-note" class="hint" style="margin-top:12px;" hidden>Have an account? <a href="/account.html">Log in</a> and your details fill in automatically.</p>
@@ -70,7 +72,7 @@
           </select>
         </div>
 
-        <form id="booking-form" class="card reveal" style="margin-top:24px;" novalidate>
+        <form id="booking-form" class="card reveal" style="margin-top:24px; border-radius:32px; box-shadow:0 20px 50px rgba(20,48,63,0.08);" novalidate>
           <div class="form-grid">
             <div>
               <label for="phone">Your phone number</label>
@@ -156,13 +158,13 @@
               <p class="hint" style="margin-top:8px;">Your info is only ever used to arrange walks. See the <a href="/privacy.html">privacy policy</a>.</p>
             </div>
             <div class="full">
-              <button id="submit-btn" class="btn btn-gold" type="submit">Book my walk</button>
+              <button id="submit-btn" class="btn btn-primary" type="submit" style="width:100%;">Book my walk</button>
             </div>
           </div>
           <div id="form-msg" class="form-msg" role="alert" hidden></div>
         </form>
 
-        <p class="hand" style="font-size:1.35rem; margin-top:24px;">see you and your pup on the paths soon!</p>
+        <p class="reveal" style="font-size:1rem; color:#4E6878; margin-top:24px; text-align:center;">Nothing is charged now, I'll text you to confirm the time.</p>
       </div>
     </section>
   </main>
@@ -174,13 +176,14 @@
           <img src="/img/paw.svg" alt="">
           <span class="brand-name">Kaylee's Dog Walking Service<small>McKenzie Towne, Calgary</small></span>
         </a>
-        <p class="foot-note">treats every dog like her own</p>
+        <p class="foot-note">walks on the paths around McKenzie Towne, in daylight, with a photo home every time</p>
       </div>
       <div>
         <h3>Say hi</h3>
         <ul>
           <li>Call or text Kaylee: <a href="tel:+15874332199">587-433-2199</a></li>
           <li><a href="/book.html">Book a walk online</a></li>
+          <li><a href="/prices.html">Prices</a></li>
         </ul>
       </div>
       <div>

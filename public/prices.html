@@ -3,18 +3,18 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Reviews | Kaylee's Dog Walking Service</title>
-  <meta name="description" content="What McKenzie Towne neighbours say about Kaylee's Dog Walking Service. Real reviews only, nothing invented.">
-  <link rel="canonical" href="https://kaylees-dog-walking.vercel.app/reviews.html">
+  <title>Prices | Kaylee's Dog Walking Service</title>
+  <meta name="description" content="30 minute walks for $20, 60 minute walks for $35, and a neighbour group discount when dogs from the same street walk together. McKenzie Towne, Calgary.">
+  <link rel="canonical" href="https://kaylees-dog-walking.vercel.app/prices.html">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Kaylee's Dog Walking Service">
-  <meta property="og:title" content="Reviews | Kaylee's Dog Walking Service">
-  <meta property="og:description" content="What McKenzie Towne neighbours say about Kaylee's Dog Walking Service. Real reviews only, nothing invented.">
-  <meta property="og:url" content="https://kaylees-dog-walking.vercel.app/reviews.html">
+  <meta property="og:title" content="Prices | Kaylee's Dog Walking Service">
+  <meta property="og:description" content="30 minute walks for $20, 60 minute walks for $35, and a neighbour group discount when dogs from the same street walk together.">
+  <meta property="og:url" content="https://kaylees-dog-walking.vercel.app/prices.html">
   <meta property="og:image" content="https://kaylees-dog-walking.vercel.app/img/og-image.png">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Reviews | Kaylee's Dog Walking Service">
-  <meta name="twitter:description" content="What McKenzie Towne neighbours say about Kaylee's Dog Walking Service. Real reviews only, nothing invented.">
+  <meta name="twitter:title" content="Prices | Kaylee's Dog Walking Service">
+  <meta name="twitter:description" content="30 minute walks for $20, 60 minute walks for $35, and a neighbour group discount when dogs from the same street walk together.">
   <meta name="twitter:image" content="https://kaylees-dog-walking.vercel.app/img/og-image.png">
   <link rel="icon" type="image/svg+xml" href="/img/paw.svg">
   <script>document.documentElement.classList.add('js');</script>
@@ -35,9 +35,9 @@
       <nav class="site-nav dropdown-panel" id="site-nav" hidden>
         <a href="/">Home</a>
         <a href="/walks.html">Where we walk</a>
-        <a href="/prices.html">Prices</a>
+        <a href="/prices.html" class="active">Prices</a>
         <a href="/about.html">About Kaylee</a>
-        <a href="/reviews.html" class="active">Reviews</a>
+        <a href="/reviews.html">Reviews</a>
         <a href="/book.html" class="nav-cta-mobile">Book a walk</a>
       </nav>
       <div class="header-actions">
@@ -58,32 +58,53 @@
   <main>
     <section class="section-tight" style="background:linear-gradient(180deg,var(--mist),#E8F3FA);">
       <div class="wrap">
-        <p class="eyebrow reveal">Reviews</p>
-        <h1 class="reveal-words" style="max-width:12em;">What the neighbours say.</h1>
-        <p class="sub reveal" style="font-size:1.1rem; max-width:34em; --d:0.1s;">Every review here is from a real client on a real street. Nothing invented, nothing bought.</p>
+        <p class="eyebrow reveal">Prices</p>
+        <h1 class="reveal-words">Two lengths. One honest price.</h1>
+        <p class="sub reveal" style="font-size:1.1rem; max-width:32em; --d:0.1s;">No sign-up fee, no packages, no minimum. Pay per walk, cancel with a day's notice.</p>
       </div>
     </section>
 
     <section class="section-tight">
       <div class="wrap">
-        <div class="reviews-waiting reveal">
-          <p><strong style="color:var(--pine);">This page is waiting on its first review.</strong> Rather than fill it with made-up quotes, it stays empty until real clients have written something. Ask each family for one line after their second or third walk.</p>
-          <a class="btn btn-primary" href="/book.html">Be the first, book a walk</a>
-        </div>
+        <div class="price-card-grid">
+          <div class="price-card-new reveal">
+            <div class="price-eyebrow">30 minutes</div>
+            <div class="price-big">$20</div>
+            <p class="price-desc">A brisk loop of the green space or the Elgin paths. Right for small dogs, seniors, and the middle of a workday.</p>
+            <div class="price-cta"><a class="btn btn-outline-blue" href="/book.html">Book a 30-minute walk</a></div>
+          </div>
 
-        <div class="review-placeholder-grid">
-          <div class="review-placeholder reveal">
-            <div class="quote">"Your review goes here."</div>
-            <div class="who">Waiting on a first walk · Prestwick</div>
+          <div class="price-card-new dark reveal" style="--d:0.08s">
+            <div aria-hidden="true" class="blob" style="top:-90px; right:-70px; width:300px; height:300px; background:radial-gradient(circle,rgba(29,108,147,0.55),rgba(29,108,147,0));"></div>
+            <div style="position:relative;">
+              <span class="price-eyebrow">60 minutes</span>
+              <span class="most-booked-tag">MOST BOOKED</span>
+            </div>
+            <div class="price-big" style="position:relative;">$35</div>
+            <p class="price-desc" style="position:relative;">The full pond loop or the lake trail. For dogs who need to actually run, and for days when nobody's home until evening.</p>
+            <div class="price-cta" style="position:relative;"><a class="btn btn-gold" href="/book.html">Book a 60-minute walk</a></div>
           </div>
-          <div class="review-placeholder reveal" style="--d:0.08s">
-            <div class="quote">"Your review goes here."</div>
-            <div class="who">Waiting on a first walk · Inverness</div>
+
+          <div class="price-card-new gold-tint reveal" style="--d:0.16s">
+            <div class="price-eyebrow">Neighbour walk</div>
+            <div class="price-big">&minus;$5</div>
+            <p class="price-desc">Off each dog, automatically, when two or three dogs from the same street book the same slot. Nothing to apply for.</p>
+            <div class="price-cta"><a class="btn" style="background:var(--white); color:var(--pine);" href="/book.html">Book with a neighbour</a></div>
           </div>
-          <div class="review-placeholder reveal" style="--d:0.16s">
-            <div class="quote">"Your review goes here."</div>
-            <div class="who">Waiting on a first walk · Elgin</div>
-          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-tight">
+      <div class="wrap">
+        <div class="card reveal" style="padding:40px 44px;">
+          <h2 style="font-size:1.6rem; margin:0 0 6px;">The small print, in plain words</h2>
+          <dl class="terms-grid">
+            <div><dt>Cancelling</dt><dd>A day's notice and it's free. Less than that and the walk may still be charged, the slot was held for your dog.</dd></div>
+            <div><dt>Paying</dt><dd>Cash or e-transfer, at the time of the walk or weekly. Whatever's easier for you.</dd></div>
+            <div><dt>Before the first walk</dt><dd>We always meet first, with you there, so your dog knows me before they go anywhere with me.</dd></div>
+            <div><dt>Weather</dt><dd>Rain and snow are fine. Extreme cold or ice means a shorter walk or a rain-check, your call.</dd></div>
+          </dl>
         </div>
       </div>
     </section>

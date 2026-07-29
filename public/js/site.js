@@ -8,6 +8,42 @@
   var reducedMotion =
     window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  // ----- intro curtain (home page only, first load) -----
+  var curtain = document.querySelector('.intro-curtain');
+  if (curtain) {
+    if (reducedMotion) {
+      curtain.style.display = 'none';
+    } else {
+      curtain.addEventListener('animationend', function () {
+        curtain.style.display = 'none';
+      });
+    }
+  }
+
+  // ----- scroll progress bar (every page that has one) -----
+  var scrollBar = document.getElementById('scroll-bar');
+  if (scrollBar) {
+    var progressTick = false;
+    var updateProgress = function () {
+      var doc = document.documentElement;
+      var max = doc.scrollHeight - doc.clientHeight;
+      var pct = max > 0 ? (doc.scrollTop / max) * 100 : 0;
+      scrollBar.style.width = pct + '%';
+      progressTick = false;
+    };
+    window.addEventListener(
+      'scroll',
+      function () {
+        if (!progressTick) {
+          window.requestAnimationFrame(updateProgress);
+          progressTick = true;
+        }
+      },
+      { passive: true }
+    );
+    updateProgress();
+  }
+
   // ----- header: hamburger menu + profile dropdown (every page) -----
   (function () {
     var navToggle = document.querySelector('.nav-toggle');

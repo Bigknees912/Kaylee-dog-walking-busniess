@@ -20,12 +20,13 @@
   <script>document.documentElement.classList.add('js');</script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;600;700;800&family=Outfit:wght@400;500;600;700&family=Nothing+You+Could+Do&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,600&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
 
   <header class="site-header">
+    <div class="scroll-progress"><div class="scroll-progress-bar" id="scroll-bar"></div></div>
     <div class="wrap">
       <a class="brand" href="/">
         <img src="/img/paw.svg" alt="Kaylee's Dog Walking Service paw print logo">
@@ -33,8 +34,9 @@
       </a>
       <nav class="site-nav dropdown-panel" id="site-nav" hidden>
         <a href="/">Home</a>
-        <a href="/about.html" class="active">About</a>
-        <a href="/services.html">Services</a>
+        <a href="/walks.html">Where we walk</a>
+        <a href="/prices.html">Prices</a>
+        <a href="/about.html" class="active">About Kaylee</a>
         <a href="/reviews.html">Reviews</a>
         <a href="/book.html" class="nav-cta-mobile">Book a walk</a>
       </nav>
@@ -54,36 +56,83 @@
   </header>
 
   <main>
-    <section class="section">
-      <div class="wrap">
-        <p class="section-kicker">nice to meet you</p>
-        <h1 class="reveal-words">Hi, I'm Kaylee</h1>
-        <p class="sub" style="font-size:1.15rem; max-width:38em;">I'm 16, in Grade 11 at St. Mary's High School, and I just moved to McKenzie Towne. I'm looking forward to meeting my new neighbours, and their dogs, one walk at a time.</p>
+    <section class="section-tight" style="background:linear-gradient(180deg,var(--mist),#E8F3FA);">
+      <div class="wrap" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(360px,1fr)); gap:44px; align-items:center;">
+        <div>
+          <p class="eyebrow reveal">About Kaylee</p>
+          <h1 class="reveal-words" style="max-width:11em;">The neighbour who just moved in.</h1>
+          <p class="sub reveal" style="font-size:1.1rem; max-width:32em; --d:0.1s;">I'm 16, in Grade 11 at St. Mary's High School, and I just moved to McKenzie Towne. I'm looking forward to meeting my new neighbours, and their dogs, one walk at a time.</p>
+          <p class="reveal" style="font-size:1rem; color:#4E6878; max-width:32em; margin-top:14px; --d:0.18s;">The rules are simple and I don't bend them: we meet before the first walk, I only walk in daylight, never more than three dogs at once, and you always get a photo when your dog is home.</p>
+        </div>
+        <div class="reveal" style="--d:0.2s;">
+          <div class="route-photo-placeholder" style="height:340px; border-radius:34px;">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" style="width:34px;height:34px;"><rect x="3" y="6" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="13" r="3.4" stroke="currentColor" stroke-width="1.6"/><path d="M8 6l1.5-2h5L16 6" stroke="currentColor" stroke-width="1.6"/></svg>
+            <span>Photo of Kaylee coming soon</span>
+          </div>
+        </div>
+      </div>
+    </section>
 
-        <div class="card-grid" style="margin-top:28px;">
+    <section class="section-lg">
+      <div class="wrap">
+        <p class="eyebrow reveal">A bit about me</p>
+        <h2 class="reveal-words" style="max-width:16em;">Active outdoors, and genuinely an animal person.</h2>
+        <div class="card-grid" style="margin-top:36px;">
           <div class="card reveal">
             <h3>Active outdoors, always have been</h3>
             <p>I've played volleyball since I was 14 and did ski jumping as a kid, so being active outside in any weather is second nature to me. Snow, sun, or a Calgary wind that changes its mind twice an hour, I'm out there.</p>
           </div>
-          <div class="card reveal" style="--d:0.1s">
+          <div class="card reveal" style="--d:0.08s">
             <h3>I understand the bond</h3>
             <p>I had a dog of my own growing up, and I sadly lost her to cancer a few years ago. That's part of why I do this: I know exactly how much your dog means to your family, and I don't take that lightly.</p>
           </div>
-          <div class="card reveal" style="--d:0.2s">
+          <div class="card reveal" style="--d:0.16s">
             <h3>Comfortable with all kinds of pets</h3>
             <p>Beyond dogs, I've spent plenty of time with bunnies, snakes, and cats too, so I'm genuinely comfortable around animals of every kind, not just the easy ones. Your dog is in trustworthy, experienced hands.</p>
           </div>
-          <div class="card reveal" style="--d:0.3s">
+          <div class="card reveal" style="--d:0.24s">
             <h3>Your dog is my dog</h3>
             <p>My rule is simple: I treat every dog like my own. That means real attention on every walk, water on hot days, paw checks on icy ones, and a photo sent to you every time so you never have to wonder.</p>
           </div>
-          <div class="card reveal" style="--d:0.4s">
+          <div class="card reveal" style="--d:0.32s">
             <h3>Local &amp; accountable</h3>
             <p>I'm not an app or a franchise, I'm your neighbour. You know where I go to school, my parents know I'm doing this, and you can always call or text me directly at <a href="tel:+15874332199">587-433-2199</a>.</p>
           </div>
         </div>
+      </div>
+    </section>
 
-        <div class="notice reveal" style="margin-top:28px;">
+    <section class="section-lg" style="background:#E8F3FA;">
+      <div class="wrap">
+        <h2 class="reveal-words" style="max-width:14em;">How the first walk goes</h2>
+        <div class="step-grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));">
+          <div class="step-card c1 reveal">
+            <div style="font-family:var(--font-display); font-weight:600; font-size:2.1rem; color:var(--teal); line-height:1;">01</div>
+            <h3 style="font-size:1.05rem; margin-top:12px;">You text or book online</h3>
+            <p style="font-size:0.9rem;">Tell me your dog's name, size and quirks. I'll reply the same day.</p>
+          </div>
+          <div class="step-card c2 reveal" style="--d:0.08s">
+            <div style="font-family:var(--font-display); font-weight:600; font-size:2.1rem; color:var(--teal); line-height:1;">02</div>
+            <h3 style="font-size:1.05rem; margin-top:12px;">We meet, with you there</h3>
+            <p style="font-size:0.9rem;">Ten minutes on your doorstep. Free, no obligation to book anything after.</p>
+          </div>
+          <div class="step-card reveal" style="--d:0.16s; background:var(--sky);">
+            <div style="font-family:var(--font-display); font-weight:600; font-size:2.1rem; color:#14506E; line-height:1;">03</div>
+            <h3 style="font-size:1.05rem; margin-top:12px;">The first walk</h3>
+            <p style="font-size:0.9rem; color:#2F5568;">Short and close to home, so your dog gets used to me before we go further.</p>
+          </div>
+          <div class="step-card c3 reveal" style="--d:0.24s">
+            <div style="font-family:var(--font-display); font-weight:600; font-size:2.1rem; color:var(--gold-ink); line-height:1;">04</div>
+            <h3 style="font-size:1.05rem; margin-top:12px;">The photo lands</h3>
+            <p style="font-size:0.9rem; color:#6A5231;">Home safe, the time, and one line about how it went. Every single walk.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-tight">
+      <div class="wrap">
+        <div class="notice reveal">
           <strong>Heads up:</strong> dog walking carries some inherent risk. Leashes can slip, dogs can react to squirrels or other animals, weather happens. I take every precaution I can on every walk, but I want to be upfront about that before you book.
         </div>
 
@@ -96,15 +145,6 @@
         </details>
       </div>
     </section>
-
-    <section class="pine-band">
-      <div class="wrap">
-        <p class="hand" style="font-size:1.4rem;">from one dog family to another</p>
-        <h2 class="reveal-words">Let's get your pup out on the paths</h2>
-        <p>Book a walk online in about a minute, or text me if you'd rather chat first.</p>
-        <a class="btn btn-gold" href="/book.html">Book a walk</a>
-      </div>
-    </section>
   </main>
 
   <footer class="site-footer">
@@ -114,13 +154,14 @@
           <img src="/img/paw.svg" alt="">
           <span class="brand-name">Kaylee's Dog Walking Service<small>McKenzie Towne, Calgary</small></span>
         </a>
-        <p class="foot-note">treats every dog like her own</p>
+        <p class="foot-note">walks on the paths around McKenzie Towne, in daylight, with a photo home every time</p>
       </div>
       <div>
         <h3>Say hi</h3>
         <ul>
           <li>Call or text Kaylee: <a href="tel:+15874332199">587-433-2199</a></li>
           <li><a href="/book.html">Book a walk online</a></li>
+          <li><a href="/prices.html">Prices</a></li>
         </ul>
       </div>
       <div>
